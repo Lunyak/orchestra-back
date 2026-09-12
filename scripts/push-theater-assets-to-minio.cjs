@@ -120,8 +120,9 @@ async function main() {
 
   const files = (await walk(theaterDir)).filter(shouldUpload);
   if (files.length === 0) {
-    console.log('[push-theater-assets] no files found');
-    return;
+    throw new Error(
+      'no files in web/public/theater (.glb are gitignored). Copy models from the dev machine first.',
+    );
   }
 
   const s3 = new S3Client({

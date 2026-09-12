@@ -689,6 +689,7 @@ export function TheaterSceneLayout({
         showEditorChrome && "theater-scene--editor-chrome",
         mobileTheaterLayout && "theater-scene--mobile-layout",
         embedLight && "theater-scene--light-rehearsal-embed",
+        immersiveMode && "theater-scene--immersive",
       )}
     >
       {sidebarRender}
@@ -713,6 +714,11 @@ export function TheaterSceneLayout({
           ) : null}
           {showModelFocusPanel && modelFocusPanelProps ? (
             <TheaterModelFocusPanel {...modelFocusPanelProps} />
+          ) : null}
+          {vm.decorActionMessage ? (
+            <p className="theater-action-toast" role="status">
+              {vm.decorActionMessage}
+            </p>
           ) : null}
           {showSmokeFocusPanel ? (
             <TheaterSmokeFocusPanel

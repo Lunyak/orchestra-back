@@ -20,3 +20,14 @@
   flex: 1 1 auto;
   min-height: 0;
 }
+
+.theater-scheme-tabs-shell:has(.theater-scene--immersive),
+.theater-scheme-tabs-shell:fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 13000;
+  width: auto;
+  height: auto;
+  max-width: none;
+  background: #111;
+}

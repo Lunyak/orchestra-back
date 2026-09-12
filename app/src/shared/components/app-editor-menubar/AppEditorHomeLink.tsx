@@ -117,6 +117,7 @@ export function AppEditorHomeLink() {
     if (!scopedBackTo) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Backspace") return;
+      if (event.defaultPrevented) return;
       if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
       if (isEditableKeyboardTarget(event.target)) return;
       event.preventDefault();

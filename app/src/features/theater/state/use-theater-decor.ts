@@ -30,6 +30,10 @@ import {
   readSceneTheaterModels,
   writeSceneTheaterModels,
 } from "../model/theater-scene-models";
+import {
+  appendClonedTheaterModels,
+  resolveAdjacentSceneIndex,
+} from "../model/theater-model-clone";
 import type { TheaterEditMode } from "./use-theater-selection";
 
 export type UseTheaterDecorArgs = {
@@ -319,8 +323,13 @@ export function useTheaterDecor({
     }, [decorActionMessage]);
 
     const copyDecorToNextScene = useCallback(() => {
-      if (!currentScene || currentPage >= scenes.length - 1) return;
-      const nextScene = scenes[currentPage + 1];
+      if (!currentScene) return;
+      const targetIndex = resolveAdjacentSceneIndex(
+        currentPage,
+        scenes.length,
+        "next",
+      );
+      const nextScene = targetIndex != null ? scenes[targetIndex] : undefined;
       if (!nextScene) return;
       const decorItems = models.filter(isTheaterDecorModel);
       if (decorItems.length === 0) {
@@ -328,23 +337,11 @@ export function useTheaterDecor({
         return;
       }
       const existing = readSceneTheaterModels(nextScene);
-      let nextId = existing.reduce((acc, item) => Math.max(acc, item.id), 0);
-      const copies = decorItems.map((item) => {
-        nextId += 1;
-        return {
-          ...item,
-          id: nextId,
-          name: `${item.name} (копия)`,
-          position: [
-            item.position[0] + 0.25,
-            item.position[1],
-            item.position[2] + 0.25,
-          ] as [number, number, number],
-        };
-      });
-      updateScene(nextScene.id, writeSceneTheaterModels([...existing, ...copies]));
+      const nextModels = appendClonedTheaterModels(existing, decorItems);
+      const copiesCount = nextModels.length - existing.length;
+      updateScene(nextScene.id, writeSceneTheaterModels(nextModels));
       setDecorActionMessage(
-        `Декор скопирован на сцену «${nextScene.title}» (${copies.length})`,
+        `Декор скопирован на сцену «${nextScene.title}» (${copiesCount})`,
       );
     }, [currentPage, currentScene, models, scenes, updateScene]);
 

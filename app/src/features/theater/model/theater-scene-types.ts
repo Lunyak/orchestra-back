@@ -12,7 +12,7 @@ export type TheaterSceneProps = {
   controlsInPanel?: boolean;
   /** Встроенный режим на странице «Спектакль»: только 3D и наведение софитов, без полного редактора театра. */
   embeddedLightRehearsal?: boolean;
-  /** Скрыть менюбар и боковые панели — 3D на весь экран. */
+  /** 3D-театр на весь экран. Управление сцены остаётся поверх. */
   immersiveMode?: boolean;
   onImmersiveModeChange?: (value: boolean) => void;
 };

@@ -515,37 +515,36 @@ export function TheaterCanvasContent({
           onSelect={onSpotlightSelect}
         />
       ))}
-      <Suspense fallback={null}>
-        <InstancedFurnitureLayer
-          models={instancedFurnitureModels}
-          activeModelId={activeModelId}
-          selectedModelIds={multiSelectedModelIds}
-          hoveredModelId={hoveredModelId}
-          onSelect={onModelSelect}
-          onContextMenu={handleModelContextMenu}
-          onHoverChange={onModelHoverChange}
-          passThroughPointerEvents={passModelPointerEventsThrough}
-        />
-        {individualModels.map((model) => {
-          const hideTrussInPreview =
-            !showEditorHelpers && model.builtin === "lightTruss6m";
-          if (hideTrussInPreview) return null;
+      <InstancedFurnitureLayer
+        models={instancedFurnitureModels}
+        activeModelId={activeModelId}
+        selectedModelIds={multiSelectedModelIds}
+        hoveredModelId={hoveredModelId}
+        onSelect={onModelSelect}
+        onContextMenu={handleModelContextMenu}
+        onHoverChange={onModelHoverChange}
+        passThroughPointerEvents={passModelPointerEventsThrough}
+      />
+      {individualModels.map((model) => {
+        const hideTrussInPreview =
+          !showEditorHelpers && model.builtin === "lightTruss6m";
+        if (hideTrussInPreview) return null;
 
-          const isActive = isModelEditMode && model.id === activeModelId;
-          const onSelect = (additive = false) => onModelSelect(model.id, additive);
-          const onActivate = () => {
-            onModelSelect(model.id);
-            onModelActivate(model.id);
-          };
-          const onHoverChange = (next: boolean) => {
-            onModelHoverChange(next ? model.id : null);
-          };
-          const selectionBoxEnabled =
-            activeTab !== "spotlights" || model.builtin !== "lightTruss6m";
-          if (model.type === "builtin") {
-            return (
+        const isActive = isModelEditMode && model.id === activeModelId;
+        const onSelect = (additive = false) => onModelSelect(model.id, additive);
+        const onActivate = () => {
+          onModelSelect(model.id);
+          onModelActivate(model.id);
+        };
+        const onHoverChange = (next: boolean) => {
+          onModelHoverChange(next ? model.id : null);
+        };
+        const selectionBoxEnabled =
+          activeTab !== "spotlights" || model.builtin !== "lightTruss6m";
+        if (model.type === "builtin") {
+          return (
+            <Suspense key={model.id} fallback={null}>
               <BuiltinModelInstance
-                key={model.id}
                 projectName={projectName}
                 model={model}
                 isActive={isActive}
@@ -560,12 +559,13 @@ export function TheaterCanvasContent({
                 passThroughPointerEvents={passModelPointerEventsThrough}
                 selectionBoxEnabled={selectionBoxEnabled}
               />
-            );
-          }
-          if (model.file) {
-            return (
+            </Suspense>
+          );
+        }
+        if (model.file) {
+          return (
+            <Suspense key={model.id} fallback={null}>
               <FileModelInstanceLoader
-                key={model.id}
                 projectName={projectName}
                 model={model}
                 isActive={isActive}
@@ -579,11 +579,11 @@ export function TheaterCanvasContent({
                 onHoverChange={onHoverChange}
                 passThroughPointerEvents={passModelPointerEventsThrough}
               />
-            );
-          }
-          return null;
-        })}
-      </Suspense>
+            </Suspense>
+          );
+        }
+        return null;
+      })}
       {showEditorHelpers && activeTab === "spotlights" && mountPointTruss ? (
         <LightTrussMountPoints
           model={mountPointTruss}

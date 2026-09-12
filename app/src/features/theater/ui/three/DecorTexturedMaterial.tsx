@@ -1,5 +1,5 @@
 import { useTexture } from "@react-three/drei";
-import { useEffect, useMemo } from "react";
+import { Suspense, useEffect, useMemo } from "react";
 import * as THREE from "three";
 import type { TheaterModel } from "../../../../shared/types/script";
 import {
@@ -50,6 +50,26 @@ type DecorTexturedMaterialProps = {
   transparent?: boolean;
   side?: THREE.Side;
 };
+
+function SolidDecorMaterial({
+  model,
+  color,
+  tone,
+  opacity = 1,
+  transparent = false,
+  side,
+}: Omit<DecorTexturedMaterialProps, "projectName" | "surfaceWidth" | "surfaceHeight">) {
+  const material = decorMaterialProps(model);
+  return (
+    <meshStandardMaterial
+      {...material}
+      color={tone || color}
+      opacity={opacity ?? material.opacity}
+      transparent={transparent || opacity < 1 || material.transparent}
+      side={side}
+    />
+  );
+}
 
 function FileDecorMaterial({
   src,
@@ -168,27 +188,41 @@ export function DecorTexturedMaterial({
 
   if (fileSrc) {
     return (
-      <FileDecorMaterial
-        src={fileSrc}
-        projectName={projectName}
-        model={model}
-        surfaceWidth={surfaceWidth}
-        surfaceHeight={surfaceHeight}
-        color={color}
-        tone={tone}
-        opacity={opacity}
-        transparent={transparent}
-        side={side}
-      />
+      <Suspense
+        fallback={
+          <SolidDecorMaterial
+            model={model}
+            color={color}
+            tone={tone}
+            opacity={opacity}
+            transparent={transparent}
+            side={side}
+          />
+        }
+      >
+        <FileDecorMaterial
+          src={fileSrc}
+          projectName={projectName}
+          model={model}
+          surfaceWidth={surfaceWidth}
+          surfaceHeight={surfaceHeight}
+          color={color}
+          tone={tone}
+          opacity={opacity}
+          transparent={transparent}
+          side={side}
+        />
+      </Suspense>
     );
   }
 
   return (
-    <meshStandardMaterial
-      {...decorMaterialProps(model)}
-      color={tone || color}
-      opacity={opacity ?? decorMaterialProps(model).opacity}
-      transparent={transparent || decorMaterialProps(model).transparent}
+    <SolidDecorMaterial
+      model={model}
+      color={color}
+      tone={tone}
+      opacity={opacity}
+      transparent={transparent}
       side={side}
     />
   );

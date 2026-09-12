@@ -18,6 +18,7 @@ import {
   type SiteEventViewRow,
   type UserRow
 } from "./api";
+import { TheaterModelsPage } from "./TheaterModelsPage";
 
 const WEB_LOCAL = (import.meta as any).env?.VITE_LINK_WEB_LOCAL ?? "http://localhost:5173";
 const WEB_SERVER = (import.meta as any).env?.VITE_LINK_WEB_SERVER ?? "http://213.226.126.196";
@@ -1641,6 +1642,7 @@ function Layout({
         <NavLink to="/site-events">Спектакли</NavLink>
         <NavLink to="/site-views">Просмотры</NavLink>
         <NavLink to="/site-marquee">Бегущая строка</NavLink>
+        <NavLink to="/theater-models">3D-модели</NavLink>
         <NavLink to="/site-media">Медиа сайта</NavLink>
         <NavLink to="/site-content">Контент сайта</NavLink>
         <NavLink to="/services">Сервисы</NavLink>
@@ -1710,6 +1712,18 @@ export default function App() {
           loggedIn ? (
             <Layout onLogout={() => setLoggedIn(false)}>
               <ServicesPage />
+            </Layout>
+          ) : (
+            <LoginPage onLogin={() => setLoggedIn(true)} />
+          )
+        }
+      />
+      <Route
+        path="/theater-models"
+        element={
+          loggedIn ? (
+            <Layout onLogout={() => setLoggedIn(false)}>
+              <TheaterModelsPage />
             </Layout>
           ) : (
             <LoginPage onLogin={() => setLoggedIn(true)} />

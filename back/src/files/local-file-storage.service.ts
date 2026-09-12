@@ -9,6 +9,12 @@ export interface StoredFileInfo {
   url: string;
 }
 
+export type StoredObjectInfo = {
+  key: string;
+  size: number;
+  lastModified: string | null;
+};
+
 /** Локальное хранилище на диске: постоянные ссылки без срока действия, без MinIO. */
 @Injectable()
 export class LocalFileStorageService {
@@ -24,6 +30,10 @@ export class LocalFileStorageService {
       this.config.get<string>('API_BASE_URL') ??
       'http://localhost:3000';
     this.publicBaseUrl = base.replace(/\/$/, '');
+  }
+
+  getPublicUrl(key: string): string {
+    return `${this.publicBaseUrl}/files/play/${encodeURIComponent(key)}`;
   }
 
   /** Сохранить файл на диск и вернуть постоянную ссылку (не истекает). */
@@ -95,6 +105,36 @@ export class LocalFileStorageService {
         );
       }
     }
+  }
+
+  async listObjectInfos(prefix: string): Promise<StoredObjectInfo[]> {
+    const normalized = prefix.replace(/^\/+/, '').replace(/\\/g, '/');
+    const root = path.join(this.storagePath, normalized);
+    const out: StoredObjectInfo[] = [];
+    const walk = async (dir: string) => {
+      let entries;
+      try {
+        entries = await fs.readdir(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const entry of entries) {
+        const abs = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          await walk(abs);
+          continue;
+        }
+        const rel = path.relative(this.storagePath, abs).replace(/\\/g, '/');
+        const st = await fs.stat(abs);
+        out.push({
+          key: rel,
+          size: st.size,
+          lastModified: st.mtime.toISOString(),
+        });
+      }
+    };
+    await walk(root);
+    return out;
   }
 
   private keyToPath(key: string): string {

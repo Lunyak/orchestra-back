@@ -2,9 +2,16 @@ import { isTheaterBuiltinTemplateKey } from "../../model/theater-model-builtin";
 import { TheaterBuiltinTemplatePicker } from "../TheaterBuiltinTemplatePicker";
 import { TheaterBtn } from "../theater-controls-ui";
 import { TheaterCollapsibleSection } from "../TheaterCollapsibleSection";
+import { TheaterCopyToSceneButtons } from "./TheaterCopyToSceneButtons";
 import type { TheaterControlsTabProps } from "./types";
 
 export function TheaterControlsModelsTab({ vm }: TheaterControlsTabProps) {
+  const hasMultiSelection = vm.multiSelectedModelIds.length > 0;
+  const activeModelIds = vm.activeModelId != null ? [vm.activeModelId] : [];
+  const copySelectionIds = hasMultiSelection
+    ? vm.multiSelectedModelIds
+    : activeModelIds;
+
   return (
     <div className="theater-layout-panel theater-layout-panel--fill">
       <TheaterCollapsibleSection
@@ -40,6 +47,17 @@ export function TheaterControlsModelsTab({ vm }: TheaterControlsTabProps) {
           onChange={(nextKey) => vm.setBuiltinModelKey(nextKey)}
           dragEnabled={Boolean(vm.currentScene)}
         />
+      </TheaterCollapsibleSection>
+      <TheaterCollapsibleSection
+        sectionId="models-copy-scene"
+        title="На другую сцену"
+        summary="С теми же координатами"
+        defaultOpen
+      >
+        <p className="theater-layout-hint">Все модели</p>
+        <TheaterCopyToSceneButtons vm={vm} />
+        <p className="theater-layout-hint">Выбранные</p>
+        <TheaterCopyToSceneButtons vm={vm} modelIds={copySelectionIds} />
       </TheaterCollapsibleSection>
     </div>
   );

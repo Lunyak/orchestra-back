@@ -197,3 +197,99 @@ button.small.danger:hover {
   border-radius: 4px;
   word-break: break-all;
 }
+
+.admin-theater-lead,
+.admin-theater-status {
+  color: #94a3b8;
+  font-size: 14px;
+  margin: 0 0 12px;
+}
+
+.admin-theater-drop {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  margin: 0 0 16px;
+  border: 1px dashed #475569;
+  background: #0f172a;
+  color: #94a3b8;
+}
+
+.admin-theater-drop.is-over {
+  border-color: var(--color-active-ascent);
+  color: var(--color-active-ascent);
+}
+
+.admin-theater-file {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border: 1px solid #475569;
+  background: #334155;
+  color: #e2e8f0;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.admin-theater-file input {
+  display: none;
+}
+
+.admin-theater-file:hover {
+  background: #475569;
+}
+
+.admin-theater-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.admin-theater-ok {
+  color: #86efac;
+  font-size: 13px;
+}
+
+.admin-theater-error {
+  color: #f87171;
+  font-size: 13px;
+}
+
+.admin-theater-section h2 {
+  margin: 24px 0 8px;
+  font-size: 16px;
+}
+
+.admin-theater-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.admin-theater-pill.is-ok {
+  color: #86efac;
+  background: #14532d;
+}
+
+.admin-theater-pill.is-missing {
+  color: var(--color-active-ascent);
+  background: #3f1d0a;
+}
+
+.admin-theater-extras {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.admin-theater-extras li {
+  display: flex;
+  gap: 12px;
+  padding: 8px 0;
+  color: #94a3b8;
+}

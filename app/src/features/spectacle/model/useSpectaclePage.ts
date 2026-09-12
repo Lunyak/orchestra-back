@@ -115,7 +115,6 @@ export function useSpectaclePage() {
   const isTheaterView = activeView === "theater";
 
   const [theaterImmersiveMode, setTheaterImmersiveModeState] = useState(false);
-  const controlsBeforeImmersiveRef = useRef(true);
   const [theaterOutlinerHost, setTheaterOutlinerHost] =
     useState<HTMLDivElement | null>(null);
   const appliedMobileTheaterPanelDefaultRef = useRef(false);
@@ -123,24 +122,15 @@ export function useSpectaclePage() {
     setTheaterOutlinerHost(node);
   }, []);
 
-  const setTheaterImmersiveMode = useCallback(
-    (value: boolean) => {
-      if (value) {
-        controlsBeforeImmersiveRef.current = showTheaterControls;
-        setShowTheaterControls(false);
-        setTheaterImmersiveModeState(true);
-        return;
-      }
-      setTheaterImmersiveModeState(false);
-      setShowTheaterControls(controlsBeforeImmersiveRef.current);
-    },
-    [setShowTheaterControls, showTheaterControls],
-  );
+  const setTheaterImmersiveMode = useCallback((value: boolean) => {
+    setTheaterImmersiveModeState(value);
+  }, []);
 
   useEffect(() => {
     if (
-      isMobile &&
-      (mobilePlaylistOpen || mobileScenesOpen || (isTheaterView && showTheaterControls))
+      theaterImmersiveMode ||
+      (isMobile &&
+        (mobilePlaylistOpen || mobileScenesOpen || (isTheaterView && showTheaterControls)))
     ) {
       document.body.style.overflow = "hidden";
     } else {
@@ -155,6 +145,7 @@ export function useSpectaclePage() {
     mobilePlaylistOpen,
     mobileScenesOpen,
     showTheaterControls,
+    theaterImmersiveMode,
   ]);
 
   useEffect(() => {

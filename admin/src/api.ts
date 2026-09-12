@@ -113,6 +113,83 @@ export async function uploadSiteMedia(params: {
   return res.json();
 }
 
+export type TheaterKitGroup =
+  | "spotlights"
+  | "rig"
+  | "doors"
+  | "humans"
+  | "library";
+
+export type TheaterAssetSlot = {
+  id: string;
+  group: TheaterKitGroup;
+  label: string;
+  key: string;
+  present: boolean;
+  size: number | null;
+  lastModified: string | null;
+  url: string;
+};
+
+export type TheaterAssetsList = {
+  prefix: string;
+  missing: number;
+  total: number;
+  slots: TheaterAssetSlot[];
+  extras: Array<{
+    key: string;
+    size: number;
+    lastModified: string | null;
+    url: string;
+  }>;
+};
+
+function adminAuthHeader(): HeadersInit {
+  const token = sessionStorage.getItem("adminToken");
+  if (!token) throw new Error("Нет adminToken (выйди/войти заново)");
+  return { Authorization: `Bearer ${token}` };
+}
+
+export async function getTheaterAssets(): Promise<TheaterAssetsList> {
+  const res = await fetch(`${base()}/admin/theater-assets`, {
+    headers: headers(),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function uploadTheaterAsset(
+  file: File,
+  key?: string,
+): Promise<{ key: string; url: string }> {
+  const q = new URLSearchParams();
+  if (key?.trim()) q.set("key", key.trim());
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(`${base()}/admin/theater-assets/upload?${q.toString()}`, {
+    method: "POST",
+    headers: adminAuthHeader(),
+    body: fd,
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function uploadTheaterAssetsMany(files: File[]): Promise<{
+  uploaded: Array<{ key: string; url: string; name: string }>;
+  errors: Array<{ name: string; message: string }>;
+}> {
+  const fd = new FormData();
+  files.forEach((file) => fd.append("files", file));
+  const res = await fetch(`${base()}/admin/theater-assets/upload-many`, {
+    method: "POST",
+    headers: adminAuthHeader(),
+    body: fd,
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export type SiteEventViewRow = { slug: string; total: number; lastHitAt: string };
 
 export async function getSiteEventViews(): Promise<{

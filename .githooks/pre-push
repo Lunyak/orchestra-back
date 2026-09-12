@@ -1,0 +1,5 @@
+#!/bin/sh
+# Ловит ошибки tsc до git push (тот же гейт, что Docker web build).
+set -e
+root="$(git rev-parse --show-toplevel)"
+exec sh "$root/scripts/typecheck-frontend.sh"

@@ -159,13 +159,15 @@ export function useTheaterKeyboardBindings(args: UseTheaterKeyboardBindingsArgs)
       const key = event.key.toLowerCase();
       if (key !== "delete" && key !== "backspace") return;
       if (isTheaterEditableTarget(event.target)) return;
-      if (!isInsideTheaterUi(event.target)) return;
+      if (!isTheaterPageActive()) return;
+
+      event.preventDefault();
+      event.stopPropagation();
 
       if (
         (editMode === "models" || editMode === "decor") &&
         (multiSelectedModelIds.length > 1 || activeModelId)
       ) {
-        event.preventDefault();
         if (multiSelectedModelIds.length > 1) {
           removeSelectedModels();
         } else if (activeModelId) {
@@ -175,7 +177,6 @@ export function useTheaterKeyboardBindings(args: UseTheaterKeyboardBindingsArgs)
       }
       if (editMode === "spotlights") {
         if (multiSelectedSpotlightIds.length > 1 || activeSpotlightId) {
-          event.preventDefault();
           if (multiSelectedSpotlightIds.length > 1) {
             removeSelectedSpotlights();
           } else if (activeSpotlightId) {
@@ -189,7 +190,6 @@ export function useTheaterKeyboardBindings(args: UseTheaterKeyboardBindingsArgs)
         resolveStageShape(layout) === "custom" &&
         activeOutlineVertexIndex != null
       ) {
-        event.preventDefault();
         removeActiveOutlineVertex();
       }
     };

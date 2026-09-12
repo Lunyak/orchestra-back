@@ -9,6 +9,7 @@
     "dev:desktop": "env -u ELECTRON_RUN_AS_NODE vite --mode desktop",
     "electron:reinstall": "bash scripts/install-electron.sh",
     "build": "npx tsc && vite build",
+    "typecheck": "tsc --noEmit",
     "build:mobile": "npx tsc && vite build --base ./ --mode mobile",
     "build:desktop": "vite build --base ./ --mode desktop",
     "package:mac": "npm run build:desktop && npm run build:mac --prefix ../desktop",

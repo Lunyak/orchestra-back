@@ -87,10 +87,21 @@ export function TheaterEditorToolsBar({
           aria-pressed={immersiveMode}
           title={
             immersiveMode
-              ? "Вернуть меню и панели (Esc)"
-              : "Скрыть меню и панели — 3D на весь экран"
+              ? "Вернуть обычный вид (Esc)"
+              : "3D-театр на весь экран"
           }
-          onClick={() => onImmersiveModeChange(!immersiveMode)}
+          onClick={() => {
+            const next = !immersiveMode;
+            onImmersiveModeChange(next);
+            const root = document.querySelector(".theater-scheme-tabs-shell");
+            if (next) {
+              void root?.requestFullscreen?.().catch(() => undefined);
+              return;
+            }
+            if (document.fullscreenElement) {
+              void document.exitFullscreen?.().catch(() => undefined);
+            }
+          }}
         >
           {immersiveMode ? "Выйти" : "Весь экран"}
         </button>

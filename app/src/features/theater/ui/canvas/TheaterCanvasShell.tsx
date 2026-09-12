@@ -1,5 +1,5 @@
 import { Canvas, useThree } from "@react-three/fiber";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, type ReactNode } from "react";
 import * as THREE from "three";
 import { filterTheaterRaycastHits } from "../../model/theater-object-context";
 import { bindTheaterRightClickNavGuard } from "../../model/theater-right-click-nav";
@@ -21,6 +21,21 @@ function TheaterRightClickNavGuard() {
   return null;
 }
 
+function TheaterCanvasViewportSync() {
+  const { camera, gl, size } = useThree();
+  useLayoutEffect(() => {
+    const width = Math.max(1, Math.floor(size.width));
+    const height = Math.max(1, Math.floor(size.height));
+    gl.setSize(width, height, false);
+    if (!(camera instanceof THREE.PerspectiveCamera)) return;
+    const nextAspect = width / height;
+    if (Math.abs(camera.aspect - nextAspect) < 0.0001) return;
+    camera.aspect = nextAspect;
+    camera.updateProjectionMatrix();
+  }, [camera, gl, size.height, size.width]);
+  return null;
+}
+
 /** R3F root: tone mapping, camera, input guards. No scene entities. */
 export function TheaterCanvasShell({
   className = "theater-canvas",
@@ -32,7 +47,8 @@ export function TheaterCanvasShell({
     <Canvas
       className={className}
       camera={{ position: camera.position, fov: camera.fov }}
-      gl={{ preserveDrawingBuffer: false }}
+      gl={{ antialias: true, preserveDrawingBuffer: false }}
+      resize={{ debounce: 0, scroll: false }}
       onCreated={({ gl, setEvents }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
         gl.toneMappingExposure = THEATER_SCENE_TONE_EXPOSURE;
@@ -42,8 +58,9 @@ export function TheaterCanvasShell({
       onWheel={(event) => event.preventDefault()}
       onContextMenu={(event) => event.preventDefault()}
       style={{ "--theater-canvas-bg": backgroundColor } as React.CSSProperties}
-      dpr={[1, 1.5]}
+      dpr={[1, 2]}
     >
+      <TheaterCanvasViewportSync />
       <TheaterRightClickNavGuard />
       <color attach="background" args={[backgroundColor]} />
       {children}

@@ -74,6 +74,10 @@ export type TheaterModelFocusPanelProps = {
   onPlace?: (preset: ModelPlacementPreset) => void;
   onResetTransform?: () => void;
   onClone?: () => void;
+  onCopyToPreviousScene?: () => void;
+  onCopyToNextScene?: () => void;
+  canCopyToPreviousScene?: boolean;
+  canCopyToNextScene?: boolean;
   onDelete?: () => void;
 };
 
@@ -96,6 +100,10 @@ export function TheaterModelFocusPanel({
   onPlace,
   onResetTransform,
   onClone,
+  onCopyToPreviousScene,
+  onCopyToNextScene,
+  canCopyToPreviousScene = false,
+  canCopyToNextScene = false,
   onDelete,
 }: TheaterModelFocusPanelProps) {
   const defaultName = `Модель ${modelId}`;
@@ -293,6 +301,32 @@ export function TheaterModelFocusPanel({
               onClick={onClone}
             >
               Клонировать
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {onCopyToPreviousScene || onCopyToNextScene ? (
+        <div className="theater-model-context-menu__row">
+          {onCopyToPreviousScene ? (
+            <button
+              type="button"
+              className="theater-model-context-menu__item theater-model-context-menu__item--compact"
+              disabled={!canCopyToPreviousScene}
+              title="Скопировать на предыдущую сцену с теми же координатами"
+              onClick={onCopyToPreviousScene}
+            >
+              ← Сцена
+            </button>
+          ) : null}
+          {onCopyToNextScene ? (
+            <button
+              type="button"
+              className="theater-model-context-menu__item theater-model-context-menu__item--compact"
+              disabled={!canCopyToNextScene}
+              title="Скопировать на следующую сцену с теми же координатами"
+              onClick={onCopyToNextScene}
+            >
+              Сцена →
             </button>
           ) : null}
         </div>

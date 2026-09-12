@@ -59,6 +59,22 @@ default:
   })();
   NODE
 
+# Тот же tsc, что Docker web (npm run build). Ловит ошибки фронта до VPS rebuild.
+typecheck:web:
+  stage: lint
+  image: ${NODE_IMAGE}
+  cache:
+    key: frontend-${CI_COMMIT_REF_SLUG}
+    paths:
+      - app/node_modules/
+      - web/node_modules/
+  script:
+    - cd app && npm ci && npm run typecheck
+    - cd ../web && npm ci && npm run typecheck
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
 # Линт бэкенда
 lint:back:
   stage: lint
@@ -156,6 +172,7 @@ build:back:
   stage: build
   needs:
     - test:migrations
+    - typecheck:web
   script:
     - |
       ssh ${SSH_OPTS} root@${DEPLOY_HOST} \
@@ -169,6 +186,7 @@ deploy:
   stage: deploy
   needs:
     - build:back
+    - typecheck:web
   script:
     - |
       ssh ${SSH_OPTS} root@${DEPLOY_HOST} "export BRANCH='${CI_DEFAULT_BRANCH}'; bash -s" <<'EOS'

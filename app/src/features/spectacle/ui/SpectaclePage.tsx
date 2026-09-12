@@ -188,8 +188,7 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     return null;
   }
 
-  const forceHidePlaylistPanel =
-    (isTheaterView && shouldSwapPanels) || (isTheaterView && theaterImmersiveMode);
+  const forceHidePlaylistPanel = isTheaterView && shouldSwapPanels;
   const playlistPanelHidden =
     forceHidePlaylistPanel ||
     (!isMobile && !showPlaylistSidebar) ||
@@ -221,8 +220,7 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     </div>
   ) : null;
 
-  const showTheaterSettingsHost =
-    isTheaterView && shouldSwapPanels && !theaterImmersiveMode;
+  const showTheaterSettingsHost = isTheaterView && shouldSwapPanels;
   const theaterHostMounted =
     showTheaterSettingsHost && (isMobile || showTheaterControls);
 
@@ -251,12 +249,9 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
   ) : null;
 
   /** Сцены на 3D-театре — только в режиме «Музыка и сцены». */
-  const theaterRehearsalMode =
-    isTheaterView && !shouldSwapPanels && !theaterImmersiveMode;
+  const theaterRehearsalMode = isTheaterView && !shouldSwapPanels;
   const showScenesSidebar =
-    shouldShowScenesSidebar &&
-    !theaterImmersiveMode &&
-    (!isTheaterView || theaterRehearsalMode);
+    shouldShowScenesSidebar && (!isTheaterView || theaterRehearsalMode);
 
   const stepsSidebarVisible =
     showScenesSidebar &&

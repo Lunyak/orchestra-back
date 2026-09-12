@@ -1,5 +1,5 @@
 import { useTexture } from "@react-three/drei";
-import { useEffect, useMemo } from "react";
+import { Suspense, useEffect, useMemo } from "react";
 import * as THREE from "three";
 import type { TheaterSurfaceMaterial as TheaterSurfaceMaterialConfig } from "../../../../shared/types/script";
 import {
@@ -168,17 +168,30 @@ export function TheaterSurfaceMaterial({
 
   if (fileSrc) {
     return (
-      <FileSurfaceMaterial
-        projectName={projectName}
-        material={material}
-        fallbackColor={fallbackColor}
-        surfaceWidth={surfaceWidth}
-        surfaceHeight={surfaceHeight}
-        src={fileSrc}
-        transparent={transparent}
-        opacity={opacity}
-        side={side}
-      />
+      <Suspense
+        fallback={
+          <meshStandardMaterial
+            color={material?.color ?? fallbackColor}
+            roughness={0.86}
+            metalness={0.04}
+            transparent={transparent || (opacity ?? 1) < 1}
+            opacity={opacity ?? 1}
+            side={side}
+          />
+        }
+      >
+        <FileSurfaceMaterial
+          projectName={projectName}
+          material={material}
+          fallbackColor={fallbackColor}
+          surfaceWidth={surfaceWidth}
+          surfaceHeight={surfaceHeight}
+          src={fileSrc}
+          transparent={transparent}
+          opacity={opacity}
+          side={side}
+        />
+      </Suspense>
     );
   }
 

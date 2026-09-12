@@ -86,12 +86,24 @@ export const TheaterScene = ({
 
   useEffect(() => {
     if (!immersiveMode || !onImmersiveModeChange) return;
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       onImmersiveModeChange(false);
     };
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement) onImmersiveModeChange(false);
+    };
+
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+      if (document.fullscreenElement) {
+        void document.exitFullscreen?.().catch(() => undefined);
+      }
+    };
   }, [immersiveMode, onImmersiveModeChange]);
 
   const isModelEditMode = vm.editMode === "models" || vm.editMode === "decor";
@@ -472,6 +484,12 @@ export const TheaterScene = ({
         vm.setPendingSnapModelId(modelId);
       },
       onClone: () => vm.cloneModel(modelId),
+      onCopyToPreviousScene: () =>
+        vm.copyModelsToAdjacentScene("previous", [modelId]),
+      onCopyToNextScene: () =>
+        vm.copyModelsToAdjacentScene("next", [modelId]),
+      canCopyToPreviousScene: vm.currentPage > 0,
+      canCopyToNextScene: vm.currentPage < vm.sceneCount - 1,
       onDelete: () => vm.removeModel(modelId),
     };
   })();

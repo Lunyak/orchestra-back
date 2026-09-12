@@ -15,18 +15,25 @@ import {
 } from "../model/theater-scene-models";
 import { isLightTrussModel, syncMountedSpotlights } from "../model/theater-truss-mounts";
 import { setLightTrussHeight } from "../model/theater-light-rig";
-import { cloneTheaterModels } from "../model/theater-model-clone";
+import {
+  appendClonedTheaterModels,
+  cloneTheaterModels,
+  resolveAdjacentSceneIndex,
+  type TheaterAdjacentSceneDirection,
+} from "../model/theater-model-clone";
 
 type UseTheaterModelsPersistenceArgs = {
   projectName: string;
   currentPage: number;
   currentScene: ScriptScene | undefined;
   scenes: ScriptScene[];
+  updateScene: (sceneId: number, patch: Partial<ScriptScene>) => void;
   updateCurrentScene: (patch: Partial<ScriptScene>) => void;
   recordTheaterHistory: () => void;
   layout: TheaterLayout;
   displaySpotlights: TheaterSpotlight[];
   models: TheaterModel[];
+  setDecorActionMessage: (message: string | null) => void;
 };
 
 export function useTheaterModelsPersistence({
@@ -34,11 +41,13 @@ export function useTheaterModelsPersistence({
   currentPage,
   currentScene,
   scenes,
+  updateScene,
   updateCurrentScene,
   recordTheaterHistory,
   layout,
   displaySpotlights,
   models,
+  setDecorActionMessage,
 }: UseTheaterModelsPersistenceArgs) {
   const normalizeModels = useCallback(
     (items: TheaterModel[]) => normalizeTheaterModels(items),
@@ -168,6 +177,48 @@ export function useTheaterModelsPersistence({
     }
   };
 
+  const copyModelsToAdjacentScene = (
+    direction: TheaterAdjacentSceneDirection,
+    modelIds?: number[],
+  ) => {
+    if (!currentScene) return;
+    const targetIndex = resolveAdjacentSceneIndex(
+      currentPage,
+      scenes.length,
+      direction,
+    );
+    if (targetIndex == null) {
+      setDecorActionMessage(
+        direction === "previous" ? "Нет предыдущей сцены" : "Нет следующей сцены",
+      );
+      return;
+    }
+    const targetScene = scenes[targetIndex];
+    if (!targetScene) {
+      setDecorActionMessage(
+        direction === "previous" ? "Нет предыдущей сцены" : "Нет следующей сцены",
+      );
+      return;
+    }
+    const source =
+      modelIds == null
+        ? models
+        : models.filter((item) => modelIds.includes(item.id));
+    if (source.length === 0) {
+      setDecorActionMessage("Нет моделей для копирования");
+      return;
+    }
+    const existing = readSceneTheaterModels(targetScene);
+    const nextModels = appendClonedTheaterModels(existing, source);
+    const copiedCount = nextModels.length - existing.length;
+    updateScene(targetScene.id, writeSceneTheaterModels(nextModels));
+    const scope = modelIds == null ? "Все модели" : "Модели";
+    const targetTitle = targetScene.title?.trim() || `сцена ${targetIndex + 1}`;
+    setDecorActionMessage(
+      `${scope} скопированы на «${targetTitle}» (${copiedCount})`,
+    );
+  };
+
   return {
     normalizeModels,
     updateModels,
@@ -176,5 +227,6 @@ export function useTheaterModelsPersistence({
     resolveModelSrc,
     previewModel,
     copyModelsFromPreviousScene,
+    copyModelsToAdjacentScene,
   };
 }

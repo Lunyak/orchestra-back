@@ -1,4 +1,4 @@
-.PHONY: help dev prod stop deploy logs status clean https-up https-down https-rebuild
+.PHONY: help dev prod stop deploy logs status clean https-up https-down https-rebuild typecheck hooks
 
 # Цвета для вывода
 GREEN  := \033[0;32m
@@ -45,6 +45,14 @@ restart: ## Перезапустить все контейнеры (production)
 restart-back: ## Перезапустить только бэкенд
 	@docker compose restart back
 
+typecheck: ## TypeScript app + web (как tsc в Docker web build)
+	@chmod +x ./scripts/typecheck-frontend.sh 2>/dev/null || true
+	@./scripts/typecheck-frontend.sh
+
+hooks: ## Включить git pre-push: typecheck до push в GitLab
+	git config core.hooksPath .githooks
+	@echo "$(GREEN)pre-push включён: git push гоняет make typecheck$(NC)"
+
 rebuild: ## Пересобрать и перезапустить (production, без local override)
 	@echo "$(YELLOW)Пересборка контейнеров...$(NC)"
 	@docker compose -f docker-compose.yml up -d --build
@@ -90,8 +98,9 @@ pull-minio: ## Зеркало бакета MinIO с VPS в локальный (�
 	@chmod +x ./scripts/pull-minio-from-server.sh 2>/dev/null || true
 	@./scripts/pull-minio-from-server.sh
 
-push-theater-assets: ## Залить web/public/theater → MinIO (prefix theater/); нужен npm ci в back/
-	@node ./scripts/push-theater-assets-to-minio.cjs
+push-theater-assets: ## Залить web/public/theater → MinIO (docker mc; .glb должны лежать локально)
+	@chmod +x ./scripts/push-theater-assets.sh 2>/dev/null || true
+	@./scripts/push-theater-assets.sh
 
 restore-db: ## Восстановить дамп в локальный postgres: make restore-db DUMP=./backups/file.dump
 	@test -n "$(DUMP)" || (echo "$(RED)Укажите DUMP=путь/к/файлу.dump$(NC)"; exit 1)

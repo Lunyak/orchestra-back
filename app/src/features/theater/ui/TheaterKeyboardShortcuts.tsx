@@ -44,7 +44,7 @@ export function TheaterKeyboardShortcuts() {
         <dd>Клонировать выбранное</dd>
         <dt>Ctrl+A</dt>
         <dd>Выбрать всё видимое на вкладке</dd>
-        <dt>Delete</dt>
+        <dt>Delete / Backspace</dt>
         <dd>Удалить выбранное</dd>
         <dt>H</dt>
         <dd>Скрыть или показать выбранное в 3D</dd>

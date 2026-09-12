@@ -1,5 +1,6 @@
 import { TheaterCollapsibleSection } from "../../TheaterCollapsibleSection";
 import { TheaterBtn } from "../../theater-controls-ui";
+import { TheaterCopyToSceneButtons } from "../TheaterCopyToSceneButtons";
 import type { DecorSectionProps } from "./types";
 
 export function TheaterControlsDecorMultiSection({ vm }: DecorSectionProps) {
@@ -51,6 +52,11 @@ export function TheaterControlsDecorMultiSection({ vm }: DecorSectionProps) {
                   Клон
                 </TheaterBtn>
               </div>
+              <p className="theater-layout-hint">На другую сцену</p>
+              <TheaterCopyToSceneButtons
+                vm={vm}
+                modelIds={vm.multiSelectedModelIds}
+              />
             </TheaterCollapsibleSection>
           ) : null}
 </>

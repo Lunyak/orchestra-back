@@ -16,6 +16,12 @@ export interface StoredFileInfo {
   url: string;
 }
 
+export type StoredObjectInfo = {
+  key: string;
+  size: number;
+  lastModified: string | null;
+};
+
 @Injectable()
 export class FileStorageService {
   private readonly s3: S3Client;
@@ -129,6 +135,37 @@ export class FileStorageService {
     } catch (err: any) {
       console.warn('[FileStorage] deleteObject failed:', key, err?.message);
     }
+  }
+
+  async listObjectInfos(prefix: string): Promise<StoredObjectInfo[]> {
+    const out: StoredObjectInfo[] = [];
+    let token: string | undefined;
+    await this.ensureBucketExists();
+    for (let i = 0; i < 10000; i += 1) {
+      const res = await this.s3.send(
+        new ListObjectsV2Command({
+          Bucket: this.bucket,
+          Prefix: prefix,
+          MaxKeys: 1000,
+          ContinuationToken: token,
+        }),
+      );
+      for (const item of res.Contents ?? []) {
+        if (!item.Key || item.Key.endsWith('/')) continue;
+        out.push({
+          key: item.Key,
+          size: item.Size ?? 0,
+          lastModified: item.LastModified
+            ? item.LastModified.toISOString()
+            : null,
+        });
+      }
+      if (!res.IsTruncated) break;
+      token = res.NextContinuationToken;
+      if (!token) break;
+      if (out.length > 200000) break;
+    }
+    return out;
   }
 
   /** Список ключей по префиксу (постранично). */

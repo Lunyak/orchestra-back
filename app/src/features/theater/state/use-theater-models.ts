@@ -26,6 +26,7 @@ export function useTheaterModels({
   currentPage,
   currentScene,
   scenes,
+  updateScene,
   updateCurrentScene,
   recordTheaterHistory,
   beginTheaterHistoryTransaction,
@@ -108,16 +109,19 @@ export function useTheaterModels({
     resolveModelSrc,
     previewModel,
     copyModelsFromPreviousScene,
+    copyModelsToAdjacentScene,
   } = useTheaterModelsPersistence({
     projectName,
     currentPage,
     currentScene,
     scenes,
+    updateScene,
     updateCurrentScene,
     recordTheaterHistory,
     layout,
     displaySpotlights,
     models,
+    setDecorActionMessage,
   });
 
   const {
@@ -225,6 +229,7 @@ export function useTheaterModels({
     updateModel,
     resolveModelSrc,
     copyModelsFromPreviousScene,
+    copyModelsToAdjacentScene,
     addModel,
     addBuiltinModel,
     addBuiltinModelAt,
