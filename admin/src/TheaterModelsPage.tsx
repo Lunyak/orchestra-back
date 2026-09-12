@@ -23,6 +23,21 @@ const GROUP_ORDER: TheaterKitGroup[] = [
   "library",
 ];
 
+const MODEL_EXT = /\.(glb|gltf)$/i;
+const UPLOAD_CHUNK = 6;
+
+type FsEntry = {
+  isFile: boolean;
+  isDirectory: boolean;
+  file: (ok: (file: File) => void, err?: (error: DOMException) => void) => void;
+  createReader: () => {
+    readEntries: (
+      ok: (entries: FsEntry[]) => void,
+      err?: (error: DOMException) => void,
+    ) => void;
+  };
+};
+
 function formatBytes(size: number | null): string {
   if (size == null || size <= 0) return "—";
   if (size < 1024) return `${size} B`;
@@ -34,6 +49,62 @@ function errorText(err: unknown): string {
   return err instanceof Error ? err.message : "Ошибка";
 }
 
+function isModelFile(file: File) {
+  return MODEL_EXT.test(file.name);
+}
+
+function filesFromList(list: FileList | File[] | null): File[] {
+  return Array.from(list ?? []).filter(isModelFile);
+}
+
+function readDirectoryEntries(reader: ReturnType<FsEntry["createReader"]>) {
+  return new Promise<FsEntry[]>((resolve, reject) => {
+    const all: FsEntry[] = [];
+    const next = () => {
+      reader.readEntries((batch) => {
+        if (batch.length === 0) {
+          resolve(all);
+          return;
+        }
+        all.push(...batch);
+        next();
+      }, reject);
+    };
+    next();
+  });
+}
+
+async function filesFromEntry(entry: FsEntry): Promise<File[]> {
+  if (entry.isFile) {
+    const file = await new Promise<File>((resolve, reject) => {
+      entry.file(resolve, reject);
+    });
+    return isModelFile(file) ? [file] : [];
+  }
+  if (!entry.isDirectory) return [];
+  const children = await readDirectoryEntries(entry.createReader());
+  const nested = await Promise.all(children.map(filesFromEntry));
+  return nested.flat();
+}
+
+async function filesFromDataTransfer(data: DataTransfer): Promise<File[]> {
+  const items = Array.from(data.items ?? []);
+  const fromEntries: File[] = [];
+  for (const item of items) {
+    const raw = item.webkitGetAsEntry?.();
+    if (!raw) continue;
+    fromEntries.push(...(await filesFromEntry(raw as unknown as FsEntry)));
+  }
+  if (fromEntries.length > 0) return fromEntries;
+  return filesFromList(data.files);
+}
+
+function dropZoneClass(dragOver: boolean, busy: boolean) {
+  if (busy) return "admin-theater-drop is-busy";
+  if (dragOver) return "admin-theater-drop is-over";
+  return "admin-theater-drop";
+}
+
 export function TheaterModelsPage() {
   const [slots, setSlots] = useState<TheaterAssetSlot[]>([]);
   const [extras, setExtras] = useState<
@@ -43,10 +114,13 @@ export function TheaterModelsPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
   const [onlyMissing, setOnlyMissing] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+
+  const busy = busyKey != null;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,40 +152,50 @@ export function TheaterModelsPage() {
 
   const uploadFiles = async (files: File[], key?: string) => {
     const list = files.filter(Boolean);
-    if (list.length === 0) return;
+    if (list.length === 0) {
+      setError("Нет .glb/.gltf в выбранных файлах");
+      return;
+    }
     setError("");
     setOk("");
     setBusyKey(key ?? "batch");
+    setProgress(list.length === 1 ? "1 / 1" : `0 / ${list.length}`);
     try {
       if (key && list.length === 1) {
         await uploadTheaterAsset(list[0], key);
         setOk(`Загружено: ${key}`);
       } else {
-        const result = await uploadTheaterAssetsMany(list);
-        const okCount = result.uploaded.length;
-        const failCount = result.errors.length;
-        const failText = result.errors
-          .map((item) => `${item.name}: ${item.message}`)
-          .join("; ");
-        if (failCount > 0) setError(failText);
-        if (okCount > 0) setOk(`Залито файлов: ${okCount}`);
+        let uploadedCount = 0;
+        const failParts: string[] = [];
+        for (let index = 0; index < list.length; index += UPLOAD_CHUNK) {
+          const chunk = list.slice(index, index + UPLOAD_CHUNK);
+          const result = await uploadTheaterAssetsMany(chunk);
+          uploadedCount += result.uploaded.length;
+          const done = Math.min(index + chunk.length, list.length);
+          setProgress(`${done} / ${list.length}`);
+          result.errors.forEach((item) => {
+            failParts.push(`${item.name}: ${item.message}`);
+          });
+        }
+        if (failParts.length > 0) setError(failParts.join("; "));
+        if (uploadedCount > 0) setOk(`Залито файлов: ${uploadedCount}`);
       }
       await load();
     } catch (err) {
       setError(errorText(err));
     } finally {
       setBusyKey(null);
+      setProgress("");
     }
   };
 
-  const onDrop = (event: DragEvent<HTMLDivElement>) => {
+  const onDrop = async (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setDragOver(false);
-    const files = Array.from(event.dataTransfer.files);
+    if (busy) return;
+    const files = await filesFromDataTransfer(event.dataTransfer);
     void uploadFiles(files);
   };
-
-  const dropClass = dragOver ? "admin-theater-drop is-over" : "admin-theater-drop";
 
   if (loading && slots.length === 0) {
     return <div className="admin-page">Загрузка…</div>;
@@ -121,10 +205,10 @@ export function TheaterModelsPage() {
     <div className="admin-page">
       <h1>3D-модели театра</h1>
       <p className="admin-theater-lead">
-        Файлы кладутся в MinIO под <code>theater/</code>. Имя файла должно
-        совпадать со слотом, например <code>stage-spotlight.glb</code>.
-        Чтобы сцена их подхватила, в сборке web нужен{" "}
-        <code>VITE_THEATER_ASSETS_BASE_URL</code> на бакет MinIO.
+        Залей папку целиком: локально это{" "}
+        <code>web/public/theater</code>. Имена файлов должны совпадать со
+        слотами (<code>stage-spotlight.glb</code> и т.д.). Сборка web должна
+        смотреть на бакет через <code>VITE_THEATER_ASSETS_BASE_URL</code>.
       </p>
       <p className="admin-theater-status">
         На проде: {total - missing} / {total}
@@ -132,29 +216,52 @@ export function TheaterModelsPage() {
       </p>
 
       <div
-        className={dropClass}
+        className={dropZoneClass(dragOver, busy)}
         onDragOver={(event) => {
           event.preventDefault();
-          setDragOver(true);
+          if (!busy) setDragOver(true);
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
       >
-        <span>Перетащите .glb сюда или выберите пачку файлов</span>
-        <label className="admin-theater-file">
-          Выбрать файлы
-          <input
-            type="file"
-            accept=".glb,.gltf"
-            multiple
-            disabled={busyKey != null}
-            onChange={(event) => {
-              const files = Array.from(event.target.files ?? []);
-              event.target.value = "";
-              void uploadFiles(files);
-            }}
-          />
-        </label>
+        <span>
+          {busy
+            ? `Загрузка ${progress}…`
+            : "Перетащи папку theater или сразу все .glb"}
+        </span>
+        <div className="admin-theater-drop__actions">
+          <label className="admin-theater-file">
+            Выбрать файлы
+            <input
+              type="file"
+              accept=".glb,.gltf"
+              multiple
+              disabled={busy}
+              onChange={(event) => {
+                const files = filesFromList(event.target.files);
+                event.target.value = "";
+                void uploadFiles(files);
+              }}
+            />
+          </label>
+          <label className="admin-theater-file">
+            Выбрать папку
+            <input
+              type="file"
+              multiple
+              disabled={busy}
+              {...({ webkitdirectory: "", directory: "" } as Record<
+                string,
+                string
+              >)}
+              onChange={(event) => {
+                const files = filesFromList(event.target.files);
+                event.target.value = "";
+                void uploadFiles(files);
+              }}
+            />
+          </label>
+        </div>
       </div>
 
       <label className="admin-theater-filter">
@@ -201,11 +308,11 @@ export function TheaterModelsPage() {
                     <td>{formatBytes(slot.size)}</td>
                     <td>
                       <label className="admin-theater-file">
-                        {busyKey === slot.key ? "…" : "Залить"}
+                        {busyKey === slot.key ? "…" : "Заменить"}
                         <input
                           type="file"
                           accept=".glb,.gltf"
-                          disabled={busyKey != null}
+                          disabled={busy}
                           onChange={(event) => {
                             const file = event.target.files?.[0];
                             event.target.value = "";
