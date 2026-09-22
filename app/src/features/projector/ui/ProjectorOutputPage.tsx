@@ -22,6 +22,11 @@ const FADE_BUCKETS_MS = [
   1200, 1500,
 ] as const;
 
+function isFirefoxWindowFullscreen(win: Window): boolean {
+  const fullScreen = Reflect.get(win, "fullScreen");
+  return typeof fullScreen === "boolean" && fullScreen;
+}
+
 function toFadeBucketMs(fadeMs: number): number {
   const normalized = normalizeProjectorTransitionMs(fadeMs);
   if (normalized <= 0) return 0;
@@ -96,10 +101,11 @@ export function ProjectorOutputPage() {
     if (!el) return;
 
     const elementFullscreen = document.fullscreenElement != null;
+    const fillsScreen =
+      window.outerWidth >= window.screen.width &&
+      window.outerHeight >= window.screen.height;
     const windowFullscreen =
-      (typeof window.fullScreen === "boolean" && window.fullScreen) ||
-      (window.outerWidth >= window.screen.width &&
-        window.outerHeight >= window.screen.height);
+      isFirefoxWindowFullscreen(window) || fillsScreen;
     if (elementFullscreen || windowFullscreen) return;
 
     try {
