@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Route, Routes, useNavigate } from "react-router-dom";
+import { SitePhotoList } from "./SitePhotoList";
 import {
   adminLogin,
   adminLogout,
@@ -659,6 +660,7 @@ function SiteEventsCrudPage() {
   const [photosFiles, setPhotosFiles] = useState<File[]>([]);
   const [reviewImagesFiles, setReviewImagesFiles] = useState<File[]>([]);
   const [rainAudioFile, setRainAudioFile] = useState<File | null>(null);
+  const photosInputRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
     setError("");
@@ -897,7 +899,6 @@ function SiteEventsCrudPage() {
   const castText = (selected?.cast ?? [])
     .map((c: SiteCastItem) => `${c.role} — ${c.actor}`)
     .join("\n");
-  const photosText = (selected?.photos ?? []).join("\n");
   const reviewsText = (selected?.reviews ?? [])
     .map((r: SiteReview) => (r.author?.trim() ? `${r.author.trim()} — ${r.text}` : r.text))
     .join("\n");
@@ -1180,9 +1181,10 @@ function SiteEventsCrudPage() {
               </label>
 
               <div style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 13, opacity: 0.9 }}>Загрузить фото (добавятся в список photos)</span>
+                <span>Фото</span>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                   <input
+                    ref={photosInputRef}
                     type="file"
                     accept="image/*"
                     multiple
@@ -1200,6 +1202,7 @@ function SiteEventsCrudPage() {
                       try {
                         await uploadAndAppendPhotos(photosFiles);
                         setPhotosFiles([]);
+                        if (photosInputRef.current) photosInputRef.current.value = "";
                       } catch (e) {
                         setError(e instanceof Error ? e.message : "Ошибка загрузки");
                       } finally {
@@ -1210,16 +1213,14 @@ function SiteEventsCrudPage() {
                     Загрузить фото
                   </button>
                 </div>
-              </div>
-
-              <label style={{ display: "grid", gap: 6 }}>
-                <span>Фото (по одному пути на строку)</span>
-                <textarea
-                  value={photosText}
-                  onChange={(e) => updateSelected({ photos: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean) })}
-                  spellCheck={false}
+                <SitePhotoList
+                  photos={selected.photos ?? []}
+                  onRemove={(index) => {
+                    const next = (selected.photos ?? []).filter((_, i) => i !== index);
+                    updateSelected({ photos: next });
+                  }}
                 />
-              </label>
+              </div>
 
               <div style={{ display: "grid", gap: 6 }}>
                 <span style={{ fontSize: 13, opacity: 0.9 }}>Загрузить фото-отзывы (добавятся в reviewImages)</span>
