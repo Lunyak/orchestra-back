@@ -40,9 +40,14 @@
   box-sizing: border-box;
 }
 
-.theater-scene-tools-bar__btn:hover {
+.theater-scene-tools-bar__btn:hover:not(:disabled) {
   color: #ccc;
   background: rgba(255, 255, 255, 0.04);
+}
+
+.theater-scene-tools-bar__btn:disabled {
+  color: #555;
+  cursor: default;
 }
 
 .theater-scene-tools-bar__btn--active,
@@ -167,23 +172,23 @@
   left: 16px;
   z-index: 5;
   display: grid;
-  gap: 8px;
+  gap: 4px;
   pointer-events: auto;
 }
 
 .theater-camera-nav__modes {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 4px;
+  gap: 2px;
 }
 
 .theater-camera-nav__mode {
-  min-height: 28px;
-  padding: 0 8px;
+  min-height: 20px;
+  padding: 0 6px;
   border: 1px solid var(--stage-brutal-border, var(--color-border-default));
   background: rgba(0, 0, 0, 0.62);
   color: var(--color-text-lighter);
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -197,17 +202,17 @@
 
 .theater-camera-nav__pad {
   display: grid;
-  grid-template-columns: 36px 36px 36px;
-  grid-template-rows: 36px 36px 36px;
-  gap: 4px;
+  grid-template-columns: 24px 24px 24px;
+  grid-template-rows: 24px 24px 24px;
+  gap: 2px;
   justify-content: center;
 }
 
 .theater-camera-nav__btn {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 24px;
+  height: 24px;
   border: 1px solid var(--stage-brutal-border, var(--color-border-default));
   background: rgba(0, 0, 0, 0.62);
   color: var(--color-text-lighter);
@@ -242,8 +247,8 @@
 }
 
 .theater-camera-nav__glyph {
-  width: 16px;
-  height: 16px;
+  width: 10px;
+  height: 10px;
   fill: currentColor;
 }
 

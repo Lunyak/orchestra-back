@@ -30,6 +30,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
 import { ProjectAccessModule } from './project-access/project-access.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { BillingModule } from './billing/billing.module';
+import { DesktopReleasesModule } from './desktop-releases/desktop-releases.module';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { BillingModule } from './billing/billing.module';
     ProjectAccessModule,
     DashboardModule,
     BillingModule,
+    DesktopReleasesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

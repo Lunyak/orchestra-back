@@ -37,6 +37,11 @@ back/prisma/generated/
 # One-shot dumps (tech card export)
 .tools/tech-card-export/
 
+# Desktop installers (large binaries; publish via data/desktop-releases on the server)
+desktop/release/
+/data/desktop-releases/*
+!/data/desktop-releases/.gitkeep
+
 # 3D-модели (тяжёлые, не нужны на сервере / в репо)
 *.glb
 

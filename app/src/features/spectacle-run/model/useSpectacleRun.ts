@@ -245,6 +245,7 @@ export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpect
     isProjectorOpen: projector.isProjectorOpen,
     openProjector: projector.openProjector,
     closeProjector: projector.closeProjector,
+    ensureProjectorOpen: projector.ensureProjectorOpen,
     showProjectorHold: (holdId?: number) => {
       const hold = holdId != null ? projector.holdImages.find((h) => Number(h.id) === holdId) : null;
       const label = hold?.title?.trim() || (holdId != null ? `заставка ${holdId}` : "заставка");

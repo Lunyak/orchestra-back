@@ -78,7 +78,7 @@ function defaultState(): ScriptUiState {
     isEditing: false,
     playlistEditMode: false,
     playlistCrossfadeEnabled: false,
-    swapTheaterPanels: false,
+    swapTheaterPanels: true,
     showTheaterControls: true,
     spectacleRunTextHidden: false,
     lightPlotMode: "rehearsal",

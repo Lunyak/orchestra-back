@@ -416,16 +416,14 @@ export function SpectacleRunProjectorPanel({
       <div className="media-projector__header">
         <span className="media-projector__title">{panelTitle}</span>
         <div className="media-projector__toolbar">
-          {showProjector ? (
-            <button
-              type="button"
-              className="media-projector__btn"
-              data-active={run.isProjectorOpen || undefined}
-              onClick={run.isProjectorOpen ? run.closeProjector : run.openProjector}
-            >
-              {run.isProjectorOpen ? "Закрыть окно" : "Открыть окно"}
-            </button>
-          ) : null}
+          <button
+            type="button"
+            className="media-projector__btn"
+            data-active={run.isProjectorOpen || undefined}
+            onClick={run.isProjectorOpen ? run.closeProjector : run.openProjector}
+          >
+            {run.isProjectorOpen ? "Закрыть окно" : "Открыть окно"}
+          </button>
           {showVideo ? (
             <>
               <button
@@ -470,7 +468,7 @@ export function SpectacleRunProjectorPanel({
             onStatus={(message) => run.setLiveStatus(message)}
           />
         </div>
-        {showProjector ? (
+        {showProjector || showVideo ? (
           <span
             className={cn(
               "media-projector__status",

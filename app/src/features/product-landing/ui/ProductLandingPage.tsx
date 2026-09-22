@@ -1,5 +1,15 @@
+import { useEffect, useState } from "react";
 import cn from "classnames";
 import { Link } from "react-router-dom";
+import {
+  detectPreferredDesktopPlatform,
+  fetchDesktopReleases,
+  desktopReleaseFileUrl,
+  formatReleaseSize,
+  pickPreferredArtifact,
+  type DesktopReleasesResponse,
+} from "../model/desktop-releases";
+import { ProductLandingDownloads } from "./ProductLandingDownloads";
 import "./product-landing.css";
 
 const FEATURES = [
@@ -33,6 +43,39 @@ const START_STEPS = [
 ] as const;
 
 export function ProductLandingPage() {
+  const [releases, setReleases] = useState<DesktopReleasesResponse | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const preferredPlatform = detectPreferredDesktopPlatform();
+  const latest = releases?.latest ?? null;
+  const preferredArtifact = pickPreferredArtifact(latest, preferredPlatform);
+  const hasPreferredDownload = Boolean(preferredArtifact && latest);
+  const downloadHref = hasPreferredDownload && preferredArtifact && latest
+    ? desktopReleaseFileUrl(latest.version, preferredArtifact.fileName)
+    : "#desktop-downloads";
+  const downloadLabel = preferredArtifact
+    ? `Скачать для ${preferredArtifact.label}`
+    : "Скачать десктоп";
+  const downloadSize = preferredArtifact
+    ? formatReleaseSize(preferredArtifact.size)
+    : null;
+  const downloadFileName = preferredArtifact?.fileName;
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchDesktopReleases()
+      .then((data) => {
+        if (cancelled) return;
+        setReleases(data);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLoadError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div className="product-landing">
       <header className="product-landing__hero">
@@ -44,7 +87,29 @@ export function ProductLandingPage() {
           Инструмент режиссёра: текст, свет, площадка и план в одном проекте.
         </p>
         <div className="product-landing__actions">
-          <Link className={cn("product-landing__btn", "product-landing__btn--primary")} to="/login">
+          {hasPreferredDownload ? (
+            <a
+              className={cn("product-landing__btn", "product-landing__btn--primary")}
+              href={downloadHref}
+              download={downloadFileName}
+            >
+              {downloadLabel}
+              {downloadSize ? (
+                <span className="product-landing__artifact-size">{downloadSize}</span>
+              ) : null}
+            </a>
+          ) : (
+            <a
+              className={cn("product-landing__btn", "product-landing__btn--primary")}
+              href="#desktop-downloads"
+            >
+              {downloadLabel}
+            </a>
+          )}
+          <Link
+            className={cn("product-landing__btn", "product-landing__btn--ghost")}
+            to="/login"
+          >
             Войти
           </Link>
           <Link
@@ -83,6 +148,12 @@ export function ProductLandingPage() {
           ))}
         </ul>
       </section>
+
+      <ProductLandingDownloads
+        releases={releases}
+        loadError={loadError}
+        preferredPlatform={preferredPlatform}
+      />
 
       <footer className="product-landing__footer">
         <Link className="product-landing__legal" to="/privacy">

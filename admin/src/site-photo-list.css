@@ -16,11 +16,27 @@
   font-size: 13px;
 }
 
+.site-photo-list__hint {
+  margin: 0 0 8px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
 .site-photo-list__item {
   display: flex;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+  cursor: grab;
+}
+
+.site-photo-list__item.is-dragging {
+  cursor: grabbing;
+  opacity: 0.45;
+}
+
+.site-photo-list__item.is-drop-target .site-photo-list__thumb {
+  border-color: var(--color-active-ascent);
 }
 
 .site-photo-list__thumb {

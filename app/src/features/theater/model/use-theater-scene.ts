@@ -31,6 +31,7 @@ import { useTheaterSceneOutliner } from "../state/use-theater-scene-outliner";
 import { useTheaterHallLayout } from "../state/use-theater-hall-layout";
 import { useTheaterFloorPlan } from "../state/use-theater-floor-plan";
 import { useTheaterKeyboardBindings } from "../state/use-theater-keyboard-bindings";
+import { useTheaterCopy } from "../state/use-theater-copy";
 import { buildTheaterViewModelSlices } from "../state/build-theater-view-model-slices";
 import { DEFAULT_THEATER_LAYOUT } from "./theater-defaults";
 import type { ActiveAlignGuide } from "./theater-align-guides";
@@ -56,7 +57,13 @@ export function useTheaterScene({
   theaterLayout,
   onTheaterLayoutChange,
 }: UseTheaterSceneArgs) {
-  const { scenes, currentPage, updateScene, playbookData } = usePlaybook();
+  const {
+    scenes,
+    currentPage,
+    updateScene,
+    playbookData,
+    saveScenesForLightPlot,
+  } = usePlaybook();
   const { selectedLightSlot, lightChannels } = useAppSelector((state) =>
     selectShowScriptMarkdownUi(state, projectName || "", "script"),
   );
@@ -345,6 +352,28 @@ export function useTheaterScene({
     nudgeActiveModel,
   } = modelsApi;
 
+  const copyApi = useTheaterCopy({
+    currentPage,
+    currentScene,
+    scenes,
+    updateScene,
+    updateCurrentScene,
+    recordTheaterHistory,
+    layout,
+    models,
+    displaySpotlights,
+    activeModelId,
+    activeSpotlightId,
+    multiSelectedModelIds,
+    multiSelectedSpotlightIds,
+    updateModels,
+    updateSpotlights,
+    setMultiSelectedModelIds,
+    setMultiSelectedSpotlightIds,
+    setDecorActionMessage,
+    saveScenes: saveScenesForLightPlot,
+  });
+
   useEffect(() => {
     if (isDragging) return;
     const syncedSpotlights = syncMountedSpotlights(spotlights, models);
@@ -616,6 +645,7 @@ export function useTheaterScene({
     ...spotlightsVm,
     ...modelsVm,
     setPendingSnapModelId,
+    ...copyApi,
     ...decorApi,
     ...floorPlanApi,
     applyHallTemplate,

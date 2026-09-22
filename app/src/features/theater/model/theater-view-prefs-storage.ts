@@ -20,9 +20,18 @@ export type TheaterViewPrefs = {
   showFloorPlan: boolean;
   /** Длинная сторона области 2D-плана (px). */
   floorPlanMaxSide: number;
+  /** Высота ленты сцен/картин в 3D viewport (px). */
+  kadrStripHeight: number;
   spectaclePreviewMode: boolean;
   alignGuidesEnabled: boolean;
-  activeTab: "navigate" | "spotlights" | "models" | "view" | "layout" | "decor";
+  activeTab:
+    | "navigate"
+    | "spotlights"
+    | "models"
+    | "view"
+    | "layout"
+    | "decor"
+    | "copy";
   /** Пульт света внизу сцены (переключатель в меню «Вид», не вкладка). */
   lightConsoleExpanded: boolean;
   outlineDrawMode: boolean;
@@ -69,11 +78,12 @@ export const DEFAULT_THEATER_VIEW_PREFS: TheaterViewPrefs = {
   wallsHideFromCamera: true,
   showFloorPlan: true,
   floorPlanMaxSide: 196,
+  kadrStripHeight: 132,
   spectaclePreviewMode: false,
   alignGuidesEnabled: true,
   activeTab: "navigate",
   outlineDrawMode: false,
-  swapTheaterPanels: false,
+  swapTheaterPanels: true,
   showTheaterControls: true,
   spotlightAimMode: "point",
   dutyLightEnabled: true,
@@ -92,6 +102,17 @@ export const DEFAULT_THEATER_VIEW_PREFS: TheaterViewPrefs = {
 
 export function theaterViewPrefsStorageKey(projectName: string) {
   return `orchestra-theater-view:${projectName || "default"}`;
+}
+
+export const THEATER_KADR_STRIP_HEIGHT_MIN = 48;
+export const THEATER_KADR_STRIP_HEIGHT_MAX = 200;
+
+export function clampKadrStripHeight(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_THEATER_VIEW_PREFS.kadrStripHeight;
+  return Math.min(
+    THEATER_KADR_STRIP_HEIGHT_MAX,
+    Math.max(THEATER_KADR_STRIP_HEIGHT_MIN, Math.round(value)),
+  );
 }
 
 function readBool(value: unknown, fallback: boolean) {
@@ -135,7 +156,8 @@ function readTab(value: unknown): TheaterViewPrefs["activeTab"] {
     value === "models" ||
     value === "view" ||
     value === "layout" ||
-    value === "decor"
+    value === "decor" ||
+    value === "copy"
   ) {
     return value;
   }
@@ -171,6 +193,12 @@ export function readTheaterViewPrefs(projectName: string): TheaterViewPrefs {
             ? 420
             : DEFAULT_THEATER_VIEW_PREFS.floorPlanMaxSide,
           140,
+        ),
+      ),
+      kadrStripHeight: clampKadrStripHeight(
+        readNumber(
+          parsed.kadrStripHeight,
+          DEFAULT_THEATER_VIEW_PREFS.kadrStripHeight,
         ),
       ),
       spectaclePreviewMode: readBool(

@@ -109,7 +109,7 @@
 .app-layout--docks-cluster > .theater-settings-sidebar--right {
   grid-column: 2;
   width: 100%;
-  min-width: 400px;
+  min-width: 320px;
   max-width: none;
 }
 
@@ -123,7 +123,7 @@
   .app-layout--docks-cluster:has(> .theater-settings-sidebar--right) {
   grid-template-columns:
     minmax(0, var(--width-content-page))
-    minmax(400px, 400px);
+    minmax(320px, 320px);
 }
 
 .app-shell-with-menubar[data-dock-playlist="true"]

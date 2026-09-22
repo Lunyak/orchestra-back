@@ -14,7 +14,7 @@ export type TheaterKitSlot = {
 
 const LIBRARY: Array<{ assetKey: string; label: string }> = [
   { assetKey: 'wooden-chair', label: 'Деревянный стул' },
-  { assetKey: 'velvet-armchair', label: 'Бархатное кресло' },
+  { assetKey: 'velvet-armchair', label: 'Кожаное кресло Честерфилд' },
   { assetKey: 'velvet-sofa', label: 'Бархатный диван' },
   { assetKey: 'dining-table', label: 'Обеденный стол' },
   { assetKey: 'round-pedestal-table', label: 'Круглый стол' },

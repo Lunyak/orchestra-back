@@ -58,13 +58,22 @@ export class FileStorageService {
   }
 
   /** Стрим объекта из S3 (для раздачи с авторизацией). */
-  async getObjectStream(key: string): Promise<{
+  async getObjectStream(
+    key: string,
+    range?: string,
+  ): Promise<{
     body: NodeJS.ReadableStream;
     contentType?: string;
     contentLength?: number;
+    contentRange?: string;
+    statusCode: number;
   }> {
     const response = await this.s3.send(
-      new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+      new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        ...(range ? { Range: range } : {}),
+      }),
     );
     if (!response.Body) {
       throw new Error('Empty body');
@@ -73,6 +82,8 @@ export class FileStorageService {
       body: response.Body as NodeJS.ReadableStream,
       contentType: response.ContentType,
       contentLength: response.ContentLength,
+      contentRange: response.ContentRange,
+      statusCode: range ? 206 : 200,
     };
   }
 

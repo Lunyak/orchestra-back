@@ -24,3 +24,8 @@ export function spectacleRunSchemeTabLabel(tabId: SpectacleRunSchemeTabId): stri
     SPECTACLE_RUN_SCHEME_TABS.find((tab) => tab.id === tabId)?.label ?? "Свет"
   );
 }
+
+/** Без картин свет не к чему привязать; видео и проектор живут в библиотеке спектакля. */
+export function spectacleRunSchemeNeedsKadr(tabId: SpectacleRunSchemeTabId): boolean {
+  return tabId === "light";
+}

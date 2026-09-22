@@ -3,6 +3,7 @@ import {
   BadRequestException,
   Controller,
   Get,
+  Headers,
   Param,
   Post,
   Query,
@@ -16,12 +17,12 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { IsIn, IsString } from 'class-validator';
 import type { Response } from 'express';
 import { memoryStorage } from 'multer';
-import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { FileStorageService } from './file-storage.service';
 import { LocalFileStorageService } from './local-file-storage.service';
 import { contentTypeForFileName } from './file-content-type';
+import { sendLocalFileWithRange } from './http-range';
 
 export class UploadFileDto {
   @IsString()
@@ -111,7 +112,11 @@ export class FilesController {
   /** Стрим файла с авторизацией (для воспроизведения в браузере через fetch + blob). */
   @Get('stream')
   @UseGuards(JwtAuthGuard)
-  async streamFile(@Query('key') key: string, @Res() res: Response) {
+  async streamFile(
+    @Query('key') key: string,
+    @Headers('range') range: string | undefined,
+    @Res() res: Response,
+  ) {
     if (!key || typeof key !== 'string') {
       return res.status(400).send('key required');
     }
@@ -123,11 +128,14 @@ export class FilesController {
         if (!st.isFile()) {
           return res.status(404).send('Not found');
         }
-        const contentType = contentTypeForFileName(decoded);
-        res.setHeader('Content-Type', contentType);
-        res.setHeader('Content-Length', String(st.size));
-        const stream = createReadStream(filePath);
-        return stream.pipe(res);
+        sendLocalFileWithRange({
+          res,
+          filePath,
+          size: st.size,
+          contentType: contentTypeForFileName(decoded),
+          rangeHeader: range,
+        });
+        return;
       } catch {
         return res.status(404).send('Not found');
       }
@@ -138,17 +146,26 @@ export class FilesController {
         body,
         contentType: s3ContentType,
         contentLength,
-      } = await this.storage.getObjectStream(decoded);
-      const contentType =
-        s3ContentType || contentTypeForFileName(decoded);
+        contentRange,
+        statusCode,
+      } = await this.storage.getObjectStream(decoded, range);
+      const contentType = s3ContentType || contentTypeForFileName(decoded);
+      res.setHeader('Accept-Ranges', 'bytes');
       res.setHeader('Content-Type', contentType);
       if (contentLength != null) {
         res.setHeader('Content-Length', String(contentLength));
       }
+      if (contentRange) {
+        res.setHeader('Content-Range', contentRange);
+      }
+      res.status(statusCode);
       return (body as any).pipe(res);
     } catch (err: any) {
-      if (err?.name === 'NoSuchKey') {
+      if (err?.name === 'NoSuchKey' || err?.$metadata?.httpStatusCode === 404) {
         return res.status(404).send('Not found');
+      }
+      if (err?.$metadata?.httpStatusCode === 416) {
+        return res.status(416).send('Range Not Satisfiable');
       }
       throw err;
     }
@@ -156,7 +173,11 @@ export class FilesController {
 
   /** Раздача файлов из локального хранилища — постоянная ссылка, без авторизации. */
   @Get('play/:key')
-  async serveLocalFile(@Param('key') keyParam: string, @Res() res: Response) {
+  async serveLocalFile(
+    @Param('key') keyParam: string,
+    @Headers('range') range: string | undefined,
+    @Res() res: Response,
+  ) {
     if (this.config.get<string>('STORAGE_TYPE') !== 'local') {
       return res.status(404).send('Not found');
     }
@@ -167,11 +188,13 @@ export class FilesController {
       if (!st.isFile()) {
         return res.status(404).send('Not found');
       }
-      const contentType = contentTypeForFileName(key);
-      res.setHeader('Content-Type', contentType);
-      res.setHeader('Content-Length', String(st.size));
-      const stream = createReadStream(filePath);
-      stream.pipe(res);
+      sendLocalFileWithRange({
+        res,
+        filePath,
+        size: st.size,
+        contentType: contentTypeForFileName(key),
+        rangeHeader: range,
+      });
     } catch {
       res.status(404).send('Not found');
     }

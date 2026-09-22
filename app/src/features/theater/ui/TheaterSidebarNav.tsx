@@ -65,6 +65,14 @@ function TheaterSidebarPanelIcon({ panelId }: { panelId: TheaterSidebarPanelId }
       </SidebarGlyph>
     );
   }
+  if (panelId === "copy") {
+    return (
+      <SidebarGlyph>
+        <rect x="8" y="7" width="11" height="13" />
+        <path d="M6 16H5V4h11v3" />
+      </SidebarGlyph>
+    );
+  }
   if (panelId === "room") {
     return (
       <SidebarGlyph>

@@ -53,29 +53,56 @@ export function buildProjectorMediaLoadPlan(input: {
   };
 }
 
+export function isTrustedLocalProjectorSrc(src: string | null | undefined): boolean {
+  return /^(project-(video|images|audio|sounds):|file:)/i.test(String(src ?? "").trim());
+}
+
 /**
  * Порядок источников для окна проектора.
- * storageKey → локальный файл в ЭТОМ окне → безопасный URL.
+ * Картинки: storageKey (blob) → локальный файл → URL.
+ * Видео: диск Electron → play-url → прочие URL → папка браузера → blob.
  */
 export type ProjectorMediaSourceStep =
+  | { kind: "playUrl"; storageKey: string }
   | { kind: "storageKey"; storageKey: string }
   | { kind: "localFile"; projectSlug: string; fileName: string }
   | { kind: "url"; src: string };
 
 export function listProjectorMediaSourceSteps(
   plan: ProjectorMediaLoadPlan,
+  kind: "image" | "video" = "image",
 ): ProjectorMediaSourceStep[] {
   const steps: ProjectorMediaSourceStep[] = [];
+  const localFile =
+    plan.projectSlug && plan.fileName
+      ? ({
+          kind: "localFile" as const,
+          projectSlug: plan.projectSlug,
+          fileName: plan.fileName,
+        } satisfies ProjectorMediaSourceStep)
+      : null;
+
+  if (kind === "video") {
+    if (plan.crossWindowSrc && isTrustedLocalProjectorSrc(plan.crossWindowSrc)) {
+      steps.push({ kind: "url", src: plan.crossWindowSrc });
+    }
+    if (plan.storageKey) {
+      steps.push({ kind: "playUrl", storageKey: plan.storageKey });
+    }
+    if (plan.crossWindowSrc && !isTrustedLocalProjectorSrc(plan.crossWindowSrc)) {
+      steps.push({ kind: "url", src: plan.crossWindowSrc });
+    }
+    if (localFile) steps.push(localFile);
+    if (plan.storageKey) {
+      steps.push({ kind: "storageKey", storageKey: plan.storageKey });
+    }
+    return steps;
+  }
+
   if (plan.storageKey) {
     steps.push({ kind: "storageKey", storageKey: plan.storageKey });
   }
-  if (plan.projectSlug && plan.fileName) {
-    steps.push({
-      kind: "localFile",
-      projectSlug: plan.projectSlug,
-      fileName: plan.fileName,
-    });
-  }
+  if (localFile) steps.push(localFile);
   if (plan.crossWindowSrc) {
     steps.push({ kind: "url", src: plan.crossWindowSrc });
   }
@@ -140,6 +167,8 @@ export type ShowVideoCommandInput = {
   muted?: boolean;
   volume?: number;
   fadeMs?: number;
+  startTime?: number;
+  paused?: boolean;
 };
 
 export type ShowVideoCommand = {
@@ -156,6 +185,8 @@ export type ShowVideoCommand = {
   muted?: boolean;
   volume?: number;
   fadeMs?: number;
+  startTime?: number;
+  paused?: boolean;
 };
 
 export function buildShowVideoCommand(input: ShowVideoCommandInput): ShowVideoCommand {
@@ -175,6 +206,10 @@ export function buildShowVideoCommand(input: ShowVideoCommandInput): ShowVideoCo
     input.fadeMs != null && Number.isFinite(input.fadeMs) && input.fadeMs > 0
       ? Math.round(input.fadeMs)
       : undefined;
+  const startTime =
+    input.startTime != null && Number.isFinite(input.startTime) && input.startTime > 0
+      ? input.startTime
+      : undefined;
   return {
     type: "show-video",
     src: videoPlan.crossWindowSrc ?? "",
@@ -189,5 +224,7 @@ export function buildShowVideoCommand(input: ShowVideoCommandInput): ShowVideoCo
     muted: input.muted,
     volume: input.volume,
     ...(fadeMs != null ? { fadeMs } : {}),
+    ...(startTime != null ? { startTime } : {}),
+    ...(input.paused ? { paused: true } : {}),
   };
 }

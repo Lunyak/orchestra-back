@@ -1,4 +1,3 @@
-import cn from "classnames";
 import { type ReactNode } from "react";
 import { useAppSelector } from "../../../shared/store/hooks";
 import { selectShowScriptMarkdownUi } from "../../show-script-markdown/model/show-script-markdown-slice";
@@ -10,9 +9,9 @@ import {
   SpectacleRunSchemeTabProvider,
   useSpectacleRunSchemeTab,
 } from "../../spectacle-run/model/spectacle-run-scheme-tab-context";
-import { SPECTACLE_RUN_SCHEME_TABS } from "../../spectacle-run/model/spectacle-run-scheme-tab";
 import { SpectacleRunRequisitesPanel } from "../../spectacle-run/ui/SpectacleRunRequisitesPanel";
 import { SpectacleRunProjectorPanel } from "../../projector/ui/SpectacleRunProjectorPanel";
+import { SpectacleRunSchemeNavigationMenuMount } from "../../spectacle-run/ui/useSpectacleRunSchemeNavigationMenu";
 import "../../spectacle-run/ui/style.css";
 import "./theater-scheme-tabs.css";
 
@@ -24,7 +23,7 @@ type TheaterSchemeTabsBodyProps = {
 
 function TheaterSchemeTabsBody({ children }: TheaterSchemeTabsBodyProps) {
   const run = useSpectacleRunContext();
-  const { activeTab, setActiveTab } = useSpectacleRunSchemeTab();
+  const { activeTab } = useSpectacleRunSchemeTab();
   const showLight = activeTab === "light";
 
   const panel =
@@ -41,30 +40,7 @@ function TheaterSchemeTabsBody({ children }: TheaterSchemeTabsBodyProps) {
 
   return (
     <div className="theater-scheme-tabs-shell">
-      <div
-        className="spectacle-run-scheme__tabs"
-        role="tablist"
-        aria-label="Разделы спектакля"
-      >
-        {SPECTACLE_RUN_SCHEME_TABS.map((tab) => {
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              className={cn(
-                "spectacle-run-scheme__tab",
-                isActive && "spectacle-run-scheme__tab--active",
-              )}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+      <SpectacleRunSchemeNavigationMenuMount />
 
       {showLight ? (
         children

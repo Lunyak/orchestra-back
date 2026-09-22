@@ -5,6 +5,7 @@ stages:
   - test
   - build
   - deploy
+  - verify
 
 variables:
   NODE_VERSION: "22"
@@ -108,6 +109,7 @@ test:back:
     - npm run test
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 # Все миграции с нуля на чистой Postgres — гейт до build/deploy на master.
 # Ловит битые SQL (нет enum/таблицы), которые иначе падают уже на хосте.
@@ -134,12 +136,17 @@ test:migrations:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
-# Критичные тесты проектора (заставка/видео во 2-м окне) — без БД
+# Критичные тесты проектора: запуск видео + план загрузки (без БД)
 test:app-projector:
   stage: test
   image: ${NODE_IMAGE}
+  cache:
+    key: frontend-${CI_COMMIT_REF_SLUG}
+    paths:
+      - app/node_modules/
   script:
     - cd app
+    - npm ci
     - npm run test:projector
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -173,6 +180,8 @@ build:back:
   needs:
     - test:migrations
     - typecheck:web
+    - test:app-projector
+    - test:back
   script:
     - |
       ssh ${SSH_OPTS} root@${DEPLOY_HOST} \
@@ -240,6 +249,21 @@ deploy:
 
       docker compose -f docker-compose.yml up -d --no-deps bot dozzle
       EOS
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# После деплоя: живой API — загрузка видео проектора и Range/play-url.
+# Секреты GitLab: PROJECTOR_E2E_EMAIL, PROJECTOR_E2E_PASSWORD (опционально PROJECTOR_E2E_PROJECT_ID).
+e2e:projector-live:
+  stage: verify
+  image: ${NODE_IMAGE}
+  needs:
+    - deploy
+  variables:
+    PROJECTOR_E2E_API_URL: "http://213.226.126.196:3000"
+  script:
+    - cd app
+    - node --test tests/projector-video-load.e2e.test.mjs
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 # Опционально: пуш образов в GitLab Container Registry

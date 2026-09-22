@@ -57,6 +57,7 @@ export function normalizeTheaterModels(items: TheaterModel[]): TheaterModel[] {
       humanBottomColor: item.humanBottomColor,
       humanShoeColor: item.humanShoeColor,
       ...(item.hidden ? { hidden: true } : {}),
+      ...(item.isRequisite ? { isRequisite: true } : {}),
     };
   });
 }

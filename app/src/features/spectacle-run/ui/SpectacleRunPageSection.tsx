@@ -14,6 +14,7 @@ import { SpectacleRunContent } from "./SpectacleRunContent";
 import { SpectacleRunProgRunContent } from "./SpectacleRunProgRunContent";
 import { CreateKadrModalHost } from "./CreateKadrModalHost";
 import { ProgRunWideLayoutBridge } from "./ProgRunWideLayoutBridge";
+import { SpectacleRunSchemeNavigationMenuMount } from "./useSpectacleRunSchemeNavigationMenu";
 import { LightConsoleSettingsModal } from "../../../shared/components/light-console/LightConsoleSettingsModal";
 import "../../../shared/components/light-console/light-console.css";
 import "./style.css";
@@ -39,6 +40,7 @@ export function SpectacleRunPageSection() {
     <SpectacleRunProvider value={run}>
       <SpectacleRunSchemeTabProvider>
         <ProgRunWideLayoutBridge />
+        <SpectacleRunSchemeNavigationMenuMount />
         <div className="spectacle-run-page-section">
         <SpectacleTechChromePortal
           left={<SpectacleRunChromeControls mode={chromeMode} />}

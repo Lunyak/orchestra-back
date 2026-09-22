@@ -5,6 +5,7 @@ import {
   buildShowHoldCommand,
   buildShowVideoCommand,
   canResolveProjectorMedia,
+  isTrustedLocalProjectorSrc,
   isWindowLocalMediaUrl,
   listProjectorMediaSourceSteps,
   sanitizeCrossWindowMediaSrc,
@@ -100,6 +101,55 @@ test("CRITICAL: load plan prefers storageKey then local file then safe URL", () 
   }
 });
 
+test("CRITICAL: video load plan streams via play-url before downloading a blob", () => {
+  const plan = buildProjectorMediaLoadPlan({
+    storageKey: "projects/hamlet/videos/v9.mp4",
+    src: "blob:http://localhost/video",
+    fileName: "v9.mp4",
+    projectSlug: "hamlet",
+  });
+
+  const steps = listProjectorMediaSourceSteps(plan, "video");
+  assert.deepEqual(
+    steps.map((step) => step.kind),
+    ["playUrl", "localFile", "storageKey"],
+  );
+  assert.equal(steps[0].kind, "playUrl");
+  if (steps[0].kind === "playUrl") {
+    assert.equal(steps[0].storageKey, "projects/hamlet/videos/v9.mp4");
+  }
+});
+
+test("CRITICAL: desktop video URLs stay ahead of remote play-url", () => {
+  const plan = buildProjectorMediaLoadPlan({
+    storageKey: "projects/hamlet/videos/v9.mp4",
+    src: "project-video://hamlet/v9.mp4",
+    fileName: "v9.mp4",
+    projectSlug: "hamlet",
+  });
+  const steps = listProjectorMediaSourceSteps(plan, "video");
+  assert.deepEqual(
+    steps.map((step) => step.kind),
+    ["url", "playUrl", "localFile", "storageKey"],
+  );
+});
+
+test("CRITICAL: unverified /local-project-media yields to play-url", () => {
+  assert.equal(isTrustedLocalProjectorSrc("project-video://hamlet/a.mp4"), true);
+  assert.equal(isTrustedLocalProjectorSrc("/local-project-media/hamlet/videos/a.mp4"), false);
+  const plan = buildProjectorMediaLoadPlan({
+    storageKey: "projects/hamlet/videos/v9.mp4",
+    src: "/local-project-media/hamlet/videos/v9.mp4",
+    fileName: "v9.mp4",
+    projectSlug: "hamlet",
+  });
+  const steps = listProjectorMediaSourceSteps(plan, "video");
+  assert.deepEqual(
+    steps.map((step) => step.kind),
+    ["playUrl", "url", "localFile", "storageKey"],
+  );
+});
+
 test("CRITICAL: desktop/dev local URLs survive cross-window sanitize", () => {
   const cmd = buildShowHoldCommand({
     holdId: 3,
@@ -141,6 +191,19 @@ test("CRITICAL: show-video strips blob for video and fallback hold", () => {
   assert.equal(cmd.projectSlug, "hamlet");
 });
 
+test("show-video keeps startTime and paused for assembly sync", () => {
+  const cmd = buildShowVideoCommand({
+    videoId: 9,
+    projectSlug: "hamlet",
+    storageKey: "projects/hamlet/videos/v9.mp4",
+    startTime: 12.5,
+    paused: true,
+  });
+
+  assert.equal(cmd.startTime, 12.5);
+  assert.equal(cmd.paused, true);
+});
+
 test("folder-picker hold without storageKey still resolves via localFile step", () => {
   const plan = buildProjectorMediaLoadPlan({
     storageKey: null,
@@ -177,4 +240,14 @@ test("CRITICAL: projector step transition ms clamps and allows hard cut", () => 
     fadeMs: 400,
   });
   assert.equal(withFade.fadeMs, 400);
+});
+
+test("assembly keeps video and projector tabs without kadrs", async () => {
+  const { spectacleRunSchemeNeedsKadr } = await import(
+    "../src/features/spectacle-run/model/spectacle-run-scheme-tab.ts"
+  );
+  assert.equal(spectacleRunSchemeNeedsKadr("light"), true);
+  assert.equal(spectacleRunSchemeNeedsKadr("video"), false);
+  assert.equal(spectacleRunSchemeNeedsKadr("projector"), false);
+  assert.equal(spectacleRunSchemeNeedsKadr("requisites"), false);
 });

@@ -214,21 +214,26 @@ export async function fetchProjectorVideoBlobUrl(storageKey: string): Promise<st
   }
 }
 
+/** Стриминговая ссылка для <video src> — без скачивания всего файла в память. */
+export async function fetchProjectorPlayUrl(storageKey: string): Promise<string | null> {
+  const token = readAccessToken();
+  if (!token) return null;
+  try {
+    const { url } = await getPlayUrl(token, storageKey);
+    const playUrl = String(url ?? "").trim();
+    return playUrl || null;
+  } catch {
+    return null;
+  }
+}
+
 /** Для превью: signed play-url (без скачивания всего файла), иначе blob. */
 export async function fetchProjectorVideoPreviewUrl(
   storageKey: string,
 ): Promise<{ src: string; blob: boolean } | null> {
-  const token = readAccessToken();
-  if (token) {
-    try {
-      const { url } = await getPlayUrl(token, storageKey);
-      const playUrl = String(url ?? "").trim();
-      if (playUrl) return { src: playUrl, blob: false };
-    } catch {
-      /* fall through to stream blob */
-    }
-  }
-  const blobUrl = await fetchVideoStreamBlobUrl(token, storageKey);
+  const playUrl = await fetchProjectorPlayUrl(storageKey);
+  if (playUrl) return { src: playUrl, blob: false };
+  const blobUrl = await fetchVideoStreamBlobUrl(readAccessToken(), storageKey);
   if (!blobUrl) return null;
   return { src: blobUrl, blob: true };
 }

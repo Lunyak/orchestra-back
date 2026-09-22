@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type CSSProperties, type ReactNode } from "react";
 import cn from "classnames";
 import type { TheaterAudienceLayout, TheaterModel, TheaterSurfaceMaterial } from "../../../shared/types/script";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
@@ -701,7 +701,14 @@ export function TheaterSceneLayout({
         />
       ) : null}
       <div className="theater-scene-main">
-        <div className="theater-scene-body">
+        <div
+          className="theater-scene-body"
+          style={
+            {
+              "--theater-kadr-strip-height": `${vm.kadrStripHeight}px`,
+            } as CSSProperties
+          }
+        >
           {mobileTheaterLayout && controlsInSidebar && !vm.showControls ? (
             <div className="theater-mobile-open-panel">
               <TheaterBtn active={false} onClick={() => vm.setShowControls(true)}>
@@ -913,6 +920,7 @@ export function TheaterSceneLayout({
                 const model = vm.models.find((item) => item.id === id);
                 if (model) requestTheaterCameraFocus(focusCameraForModel(model, vm.layout));
               }}
+              sceneRenderKey={String(vm.currentScene?.id ?? "none")}
               activeModelObject={vm.activeModelObject}
               activeModelObjectId={vm.activeModelObjectId ?? undefined}
               modelTransformMode={vm.modelTransformMode}

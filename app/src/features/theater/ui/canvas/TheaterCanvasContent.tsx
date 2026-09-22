@@ -118,6 +118,7 @@ export type TheaterCanvasContentProps = {
   onModelContextMenu: (id: number) => void;
   onModelHoverChange: (id: number | null) => void;
   onModelActivate: (id: number) => void;
+  sceneRenderKey: string;
   activeModelObject: THREE.Object3D | null;
   activeModelObjectId: number | undefined;
   modelTransformMode: "translate" | "rotate" | "scale";
@@ -243,6 +244,7 @@ export function TheaterCanvasContent({
   onModelContextMenu,
   onModelHoverChange,
   onModelActivate,
+  sceneRenderKey,
   activeModelObject,
   activeModelObjectId,
   modelTransformMode,
@@ -516,6 +518,7 @@ export function TheaterCanvasContent({
         />
       ))}
       <InstancedFurnitureLayer
+        key={sceneRenderKey}
         models={instancedFurnitureModels}
         activeModelId={activeModelId}
         selectedModelIds={multiSelectedModelIds}
@@ -543,7 +546,7 @@ export function TheaterCanvasContent({
           activeTab !== "spotlights" || model.builtin !== "lightTruss6m";
         if (model.type === "builtin") {
           return (
-            <Suspense key={model.id} fallback={null}>
+            <Suspense key={`${sceneRenderKey}-${model.id}`} fallback={null}>
               <BuiltinModelInstance
                 projectName={projectName}
                 model={model}
@@ -564,7 +567,7 @@ export function TheaterCanvasContent({
         }
         if (model.file) {
           return (
-            <Suspense key={model.id} fallback={null}>
+            <Suspense key={`${sceneRenderKey}-${model.id}`} fallback={null}>
               <FileModelInstanceLoader
                 projectName={projectName}
                 model={model}

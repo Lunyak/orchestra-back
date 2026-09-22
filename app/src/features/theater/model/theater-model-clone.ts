@@ -24,14 +24,31 @@ export function resolveAdjacentSceneIndex(
   return nextIndex;
 }
 
+function collectUsedTheaterModelIds(models: TheaterModel[]): Set<number> {
+  const usedIds = new Set<number>();
+  for (const item of models) {
+    const id = Number(item.id);
+    if (Number.isFinite(id) && id > 0) usedIds.add(id);
+  }
+  return usedIds;
+}
+
+function nextFreeTheaterModelId(usedIds: Set<number>, fromId: number): number {
+  let nextId = Number.isFinite(fromId) && fromId > 0 ? Math.trunc(fromId) : 1;
+  while (usedIds.has(nextId)) nextId += 1;
+  return nextId;
+}
+
 /** Copies models onto another scene with new ids and the same coordinates. */
 export function appendClonedTheaterModels(
   existing: TheaterModel[],
   source: TheaterModel[],
 ): TheaterModel[] {
-  let nextId = existing.reduce((acc, item) => Math.max(acc, item.id), 0);
+  const usedIds = collectUsedTheaterModelIds(existing);
+  let nextId = usedIds.size > 0 ? Math.max(...usedIds) : 0;
   const copies = cloneTheaterModels(source).map((item) => {
-    nextId += 1;
+    nextId = nextFreeTheaterModelId(usedIds, nextId + 1);
+    usedIds.add(nextId);
     return { ...item, id: nextId };
   });
   return [...existing, ...copies];

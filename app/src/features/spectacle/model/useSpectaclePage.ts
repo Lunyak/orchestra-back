@@ -76,14 +76,6 @@ export function useSpectaclePage() {
     toggleTheaterControls,
   } = useScriptUI();
 
-  useLayoutEffect(() => {
-    if (!projectName) return;
-    const prefs = readTheaterViewPrefs(projectName);
-    setSwapTheaterPanels(prefs.swapTheaterPanels);
-    setShowTheaterControls(prefs.showTheaterControls);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- restore only on project switch
-  }, [projectName]);
-
   const togglePanelsWithPersist = useCallback(() => {
     const nextSwap = !shouldSwapPanels;
     togglePanels();
@@ -113,6 +105,28 @@ export function useSpectaclePage() {
   const projectSection = getProjectSectionFromPath(location.pathname);
   const activeView = resolveActiveView(projectSection);
   const isTheaterView = activeView === "theater";
+
+  useLayoutEffect(() => {
+    if (!projectName) return;
+    const prefs = readTheaterViewPrefs(projectName);
+    if (isTheaterView && !isMobile) {
+      setSwapTheaterPanels(true);
+      setShowTheaterControls(true);
+      patchTheaterViewPrefs(projectName, {
+        swapTheaterPanels: true,
+        showTheaterControls: true,
+      });
+      return;
+    }
+    setSwapTheaterPanels(prefs.swapTheaterPanels);
+    setShowTheaterControls(prefs.showTheaterControls);
+  }, [
+    isMobile,
+    isTheaterView,
+    projectName,
+    setShowTheaterControls,
+    setSwapTheaterPanels,
+  ]);
 
   const [theaterImmersiveMode, setTheaterImmersiveModeState] = useState(false);
   const [theaterOutlinerHost, setTheaterOutlinerHost] =

@@ -28,6 +28,7 @@ import type { useLightConsoleState } from "../../../shared/components/light-cons
 import type { SpectacleTapeItem } from "../model/spectacle-kadr-tape";
 import { SpectacleRunProjectorPanel } from "../../projector/ui/SpectacleRunProjectorPanel";
 import { SpectacleRunRequisitesPanel } from "./SpectacleRunRequisitesPanel";
+import { SpectacleRunAssemblyPlayer } from "./SpectacleRunAssemblyPlayer";
 import { useProject } from "../../project/model/project-context";
 import {
   patchTheaterViewPrefs,
@@ -45,7 +46,7 @@ import {
   type TheaterLiveBlackoutRequest,
 } from "../../theater/model/theater-live-blackout";
 import { useSpectacleRunSchemeTab } from "../model/spectacle-run-scheme-tab-context";
-import { SPECTACLE_RUN_SCHEME_TABS } from "../model/spectacle-run-scheme-tab";
+import { spectacleRunSchemeNeedsKadr } from "../model/spectacle-run-scheme-tab";
 
 export type SpectacleRunSchemePaneProps = {
   scene: ScriptScene | null;
@@ -246,43 +247,28 @@ export function SpectacleRunSchemePane({
     tapeItem?.headingTitle,
   ]);
 
-  if (tapeItem?.isPlaceholder) {
+  if (tapeItem?.isPlaceholder && spectacleRunSchemeNeedsKadr(activeTab)) {
     return (
-      <div className="spectacle-run-scheme spectacle-run-scheme--empty">
+      <div className="spectacle-run-scheme spectacle-run-scheme--empty light-plot-empty--actionable">
         <p>
           В сцене «{tapeItem.sceneTitle}» пока нет картин. Добавьте первую.
         </p>
+        <p className="spectacle-run-scheme__empty-hint">
+          Репетицию с видео можно вести без картин — откройте вкладку «Видео» или «Проектор».
+        </p>
+        <button
+          type="button"
+          className="light-plot-empty__btn"
+          onClick={() => setActiveTab("video")}
+        >
+          Открыть видео
+        </button>
       </div>
     );
   }
 
   return (
     <div className="spectacle-run-scheme">
-      <div
-        className="spectacle-run-scheme__tabs"
-        role="tablist"
-        aria-label="Разделы спектакля"
-      >
-        {SPECTACLE_RUN_SCHEME_TABS.map((tab) => {
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              className={cn(
-                "spectacle-run-scheme__tab",
-                isActive && "spectacle-run-scheme__tab--active",
-              )}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-
       <div className="spectacle-run-scheme__tab-panel" role="tabpanel">
         {activeTab === "light" ? (
           <>
@@ -414,6 +400,7 @@ export function SpectacleRunSchemePane({
                   }}
                   className="spectacle-run-scheme__console"
                 />
+                <SpectacleRunAssemblyPlayer />
               </div>
             </div>
           </>

@@ -4,6 +4,7 @@ import type {
   TheaterRoomSectionId,
   TheaterSpotlightsSectionId,
 } from "../../model/theater-sidebar-nav";
+import { TheaterControlsCopyTab } from "./TheaterControlsCopyTab";
 import { TheaterControlsDecorTab } from "./TheaterControlsDecorTab";
 import { TheaterControlsLayoutTab } from "./TheaterControlsLayoutTab";
 import { TheaterControlsModelsTab } from "./TheaterControlsModelsTab";
@@ -48,6 +49,7 @@ export function TheaterControlsSettings({
         />
       ) : null}
       {isModelsTab ? <TheaterControlsModelsTab vm={vm} /> : null}
+      {activeTab === "copy" ? <TheaterControlsCopyTab vm={vm} /> : null}
       {activeTab === "decor" ? <TheaterControlsDecorTab vm={vm} /> : null}
       {activeTab === "layout" ? (
         <TheaterControlsLayoutTab

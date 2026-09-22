@@ -8,7 +8,10 @@ import {
   type ProjectorMediaContext,
 } from "../model/projector-media";
 import { resolveVideoPreviewSeekTime } from "../model/projector-video-preview";
-import { isLocalProjectMediaUrl } from "../../../shared/platform/media-url";
+import {
+  isTrustedLocalProjectorSrc,
+  isWindowLocalMediaUrl,
+} from "../model/projector-cross-window-media";
 import "./projector-media-preview.css";
 
 export type ProjectorMediaPreviewProps = {
@@ -33,6 +36,10 @@ type PreviewResolveResult = {
   storageKey: string | null;
 };
 
+function isReadyLocalPreviewSrc(src: string | null | undefined): boolean {
+  return isWindowLocalMediaUrl(src) || isTrustedLocalProjectorSrc(src);
+}
+
 export async function resolveProjectorPreviewSrc(
   ctx: ProjectorMediaContext,
   mode: "video" | "hold",
@@ -46,8 +53,12 @@ export async function resolveProjectorPreviewSrc(
     const asset = resolveProjectorHoldAsset(ctx, holdId);
     if (!asset) return { src: null, blob: false, storageKey: null };
     if (!preferRemote) {
-      if (asset.fallbackSrc && isLocalProjectMediaUrl(asset.fallbackSrc)) {
-        return { src: asset.fallbackSrc, blob: false, storageKey: asset.storageKey };
+      if (isReadyLocalPreviewSrc(asset.fallbackSrc)) {
+        return {
+          src: asset.fallbackSrc,
+          blob: isWindowLocalMediaUrl(asset.fallbackSrc),
+          storageKey: asset.storageKey,
+        };
       }
       if (!asset.storageKey && asset.fallbackSrc) {
         return { src: asset.fallbackSrc, blob: false, storageKey: null };
@@ -65,8 +76,12 @@ export async function resolveProjectorPreviewSrc(
   if (!asset) return { src: null, blob: false, storageKey: null };
 
   if (!preferRemote) {
-    if (asset.fallbackSrc && isLocalProjectMediaUrl(asset.fallbackSrc)) {
-      return { src: asset.fallbackSrc, blob: false, storageKey: asset.storageKey };
+    if (isReadyLocalPreviewSrc(asset.fallbackSrc)) {
+      return {
+        src: asset.fallbackSrc,
+        blob: isWindowLocalMediaUrl(asset.fallbackSrc),
+        storageKey: asset.storageKey,
+      };
     }
     if (!asset.storageKey && asset.fallbackSrc) {
       return { src: asset.fallbackSrc, blob: false, storageKey: null };

@@ -86,6 +86,11 @@ export function useTheaterModels({
   }, [activeModelWorldSize]);
 
   useEffect(() => {
+    setActiveModelObject(null);
+    setActiveModelObjectId(null);
+  }, [currentScene?.id]);
+
+  useEffect(() => {
     if (!activeModelId || (editMode !== "models" && editMode !== "decor")) {
       setIsDragging(false);
     }
@@ -206,6 +211,7 @@ export function useTheaterModels({
     setActiveModelSizeTick,
     pendingSnapModelId,
     setPendingSnapModelId,
+    sceneId: currentScene?.id,
   });
 
   return {

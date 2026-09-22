@@ -30,6 +30,7 @@ services:
       PORT: 3000
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       ADMIN_SECRET: ${ADMIN_SECRET:-change-admin-secret}
+      DESKTOP_RELEASES_DIR: /app/data/desktop-releases
       # Yandex SMTP (сброс пароля / почтовые уведомления)
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-465}
@@ -63,6 +64,8 @@ services:
       S3_BUCKET: ${S3_BUCKET:-orchestra-media}
     ports:
       - "3000:3000"
+    volumes:
+      - ./data/desktop-releases:/app/data/desktop-releases:ro
     depends_on:
       postgres:
         condition: service_healthy

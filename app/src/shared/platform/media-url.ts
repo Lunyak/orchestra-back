@@ -75,7 +75,7 @@ export function isDesktopApp(): boolean {
 
 /** Браузер на npm run dev — медиа с локального диска. */
 export function isBrowserDevLocalProjects(): boolean {
-  return Boolean(import.meta.env.DEV) && !isDesktopApp();
+  return Boolean(import.meta.env?.DEV) && !isDesktopApp();
 }
 
 export function isLocalProjectMediaUrl(url: string | null | undefined): boolean {

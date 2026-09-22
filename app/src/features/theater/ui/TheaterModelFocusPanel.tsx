@@ -315,7 +315,7 @@ export function TheaterModelFocusPanel({
               title="Скопировать на предыдущую сцену с теми же координатами"
               onClick={onCopyToPreviousScene}
             >
-              ← Сцена
+              ← Пред. сцена
             </button>
           ) : null}
           {onCopyToNextScene ? (
@@ -326,7 +326,7 @@ export function TheaterModelFocusPanel({
               title="Скопировать на следующую сцену с теми же координатами"
               onClick={onCopyToNextScene}
             >
-              Сцена →
+              След. сцена →
             </button>
           ) : null}
         </div>

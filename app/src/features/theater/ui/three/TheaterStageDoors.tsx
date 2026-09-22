@@ -28,6 +28,7 @@ import {
   resolveStageRise,
 } from "../../model/theater-stage-geometry";
 import { STAGE_DOOR_MODEL_BASE, StageDoorModel } from "./StageDoorModel";
+import { useHiddenWallGroup } from "./use-hidden-wall-group";
 
 const WALL_PLANE_MIN_ALIGN = 0.18;
 
@@ -288,6 +289,7 @@ function TheaterDoorLeaf({
 
 export type TheaterStageDoorsProps = {
   layout: TheaterLayout;
+  wallsHideFromCamera?: boolean;
   activeDoorId?: number;
   interactive?: boolean;
   onSelectDoor?: (doorId: number) => void;
@@ -301,6 +303,7 @@ export type TheaterStageDoorsProps = {
 
 export function TheaterStageDoors({
   layout,
+  wallsHideFromCamera = true,
   activeDoorId,
   interactive = false,
   onSelectDoor,
@@ -314,11 +317,12 @@ export function TheaterStageDoors({
   const doors = useMemo(() => resolveLayoutDoors(layout), [layout]);
   const hallOffsetX = resolveHallOffsetX(layout);
   const hallOffsetZ = resolveHallOffsetZ(layout);
+  const hiddenGroup = useHiddenWallGroup(layout, wallsHideFromCamera);
   if ((layout.stageShape ?? "rectangle") === "circle") return null;
   return (
     <>
       {doors.map((door) =>
-        isWallHidden(layout, door.wall) ? null : (
+        isWallHidden(layout, door.wall) || hiddenGroup === door.wall ? null : (
           <TheaterDoorLeaf
             key={door.id}
             layout={layout}

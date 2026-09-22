@@ -122,6 +122,15 @@ export function isHumanBuiltinTheaterModel(
   );
 }
 
+export function isTheaterPersonModel(model: TheaterModel): boolean {
+  return (
+    model.builtin === "actor" ||
+    model.builtin === "stageActor" ||
+    model.builtin === "dancer" ||
+    isHumanBuiltinTheaterModel(model.builtin)
+  );
+}
+
 export function createBuiltinTheaterModel(
   nextId: number,
   builtinModelKey: TheaterModel["builtin"],

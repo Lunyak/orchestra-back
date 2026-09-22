@@ -5,8 +5,9 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "test:routes": "node --import ./tests/register-relative-ts.mjs --test tests/router-paths.test.mjs tests/dashboard.test.mjs",
-    "test:projector": "node --test tests/projector-cross-window-media.test.mjs",
-    "test": "node --import ./tests/register-relative-ts.mjs --test tests/router-paths.test.mjs tests/dashboard.test.mjs tests/projector-cross-window-media.test.mjs"
+    "test:projector": "node --import ./tests/register-relative-ts.mjs --test tests/projector-cross-window-media.test.mjs tests/projector-launch.test.mjs",
+    "test:projector-e2e": "node --test tests/projector-video-load.e2e.test.mjs",
+    "test": "node --import ./tests/register-relative-ts.mjs --test tests/router-paths.test.mjs tests/dashboard.test.mjs tests/projector-cross-window-media.test.mjs tests/projector-launch.test.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",

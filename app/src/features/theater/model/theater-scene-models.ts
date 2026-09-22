@@ -29,7 +29,11 @@ export function splitSceneTheaterModels(models: TheaterModel[]): {
 export function writeSceneTheaterModels(
   models: TheaterModel[],
 ): Pick<ScriptScene, "theaterModels" | "theaterDecor"> {
-  return splitSceneTheaterModels(models);
+  const split = splitSceneTheaterModels(models);
+  return {
+    theaterModels: split.theaterModels,
+    theaterDecor: split.theaterDecor ?? [],
+  };
 }
 
 /** Payload for sync push (props + decor arrays). */

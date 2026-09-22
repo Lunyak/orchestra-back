@@ -21,9 +21,9 @@ export const THEATER_ASSET_LIBRARY: TheaterAssetLibraryItem[] = [
   {
     builtin: "libraryVelvetArmchair",
     assetKey: "velvet-armchair",
-    label: "Бархатное кресло",
+    label: "Кожаное кресло Честерфилд",
     category: "furniture",
-    size: [1, 1.4, 0.85],
+    size: [1.06, 1.5, 1.08],
   },
   {
     builtin: "libraryVelvetSofa",

@@ -140,9 +140,9 @@
 }
 
 .theater-settings-sidebar--right {
-  --theater-sidebar-width: 400px;
+  --theater-sidebar-width: 320px;
   width: var(--theater-sidebar-width);
-  min-width: 400px;
+  min-width: var(--theater-sidebar-width);
   max-width: var(--theater-sidebar-width);
   position: relative;
   border-left: 1px solid var(--color-border-panel-subtle);

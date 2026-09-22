@@ -45,17 +45,29 @@ function serveFile(res, filePath) {
 async function proxy(req, res, pathname) {
   const queryIndex = req.url.indexOf('?');
   const query = queryIndex >= 0 ? req.url.slice(queryIndex) : '';
-  const url = new URL(pathname + query, BACK_URL);
-  const headers = { ...req.headers, host: new URL(BACK_URL).host };
-  const opt = { method: req.method, headers };
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
-    const chunks = [];
-    for await (const c of req) chunks.push(c);
-    opt.body = Buffer.concat(chunks);
-  }
-  const backend = await fetch(url.toString(), opt);
-  res.writeHead(backend.status, Object.fromEntries(backend.headers.entries()));
-  res.end(Buffer.from(await backend.arrayBuffer()));
+  const target = new URL(pathname + query, BACK_URL);
+  const headers = { ...req.headers, host: target.host };
+  const proxyReq = http.request(
+    {
+      protocol: target.protocol,
+      hostname: target.hostname,
+      port: target.port || (target.protocol === 'https:' ? 443 : 80),
+      path: `${target.pathname}${target.search}`,
+      method: req.method,
+      headers,
+    },
+    (proxyRes) => {
+      res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
+      proxyRes.pipe(res);
+    },
+  );
+  proxyReq.on('error', () => {
+    if (!res.headersSent) {
+      res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
+    }
+    res.end('Bad Gateway');
+  });
+  req.pipe(proxyReq);
 }
 
 function proxyUpgrade(req, socket, head) {

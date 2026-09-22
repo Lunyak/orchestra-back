@@ -7,6 +7,7 @@ export type TheaterSidebarPanelId =
   | "spotlights"
   | "models"
   | "decor"
+  | "copy"
   | "room"
   | "layout";
 
@@ -54,7 +55,7 @@ export type TheaterSidebarNavGroup = {
 export const THEATER_SIDEBAR_GROUPS: TheaterSidebarNavGroup[] = [
   {
     id: "overview",
-    title: "Обзор",
+    title: "",
     items: [
       { id: "scene", label: "Список элементов" },
       { id: "view", label: "Вид" },
@@ -67,6 +68,7 @@ export const THEATER_SIDEBAR_GROUPS: TheaterSidebarNavGroup[] = [
       { id: "spotlights", label: "Софиты" },
       { id: "models", label: "Модели" },
       { id: "decor", label: "Декор" },
+      { id: "copy", label: "Копирование" },
       { id: "room", label: "Помещение" },
       { id: "layout", label: "План" },
     ],
@@ -136,6 +138,10 @@ export function applyTheaterSidebarPanel(
   if (panelId === "decor") {
     vm.setActiveTab("decor");
     vm.setEditMode("decor");
+    return;
+  }
+  if (panelId === "copy") {
+    vm.setActiveTab("copy");
     return;
   }
   if (panelId === "room" || panelId === "layout") {

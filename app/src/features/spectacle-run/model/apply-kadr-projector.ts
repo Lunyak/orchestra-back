@@ -20,7 +20,12 @@ function resolveTransitionMs(ctx: ProjectorMediaContext): number | undefined {
 export async function applyKadrProjector(
   cue: KadrProjectorCue | null | undefined,
   ctx: ProjectorMediaContext,
-  options?: { videoMuted?: boolean; videoVolume?: number },
+  options?: {
+    videoMuted?: boolean;
+    videoVolume?: number;
+    startTime?: number;
+    paused?: boolean;
+  },
 ) {
   if (!cue) return;
 
@@ -73,6 +78,8 @@ export async function applyKadrProjector(
       muted: options?.videoMuted ?? (options?.videoVolume ?? 1) === 0,
       volume: options?.videoVolume ?? (options?.videoMuted ? 0 : 1),
       fadeMs,
+      startTime: options?.startTime,
+      paused: options?.paused,
     }),
   );
 }

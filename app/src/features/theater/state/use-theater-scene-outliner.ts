@@ -123,7 +123,7 @@ export function useTheaterSceneOutliner({
     const tab =
       activeTab === "navigate"
         ? editMode
-        : activeTab === "view" || activeTab === "layout"
+        : activeTab === "view" || activeTab === "layout" || activeTab === "copy"
           ? null
           : activeTab;
     if (tab === "spotlights") {

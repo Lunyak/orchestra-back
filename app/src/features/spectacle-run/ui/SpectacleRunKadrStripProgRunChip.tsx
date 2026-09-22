@@ -5,6 +5,11 @@ import cn from "classnames";
 import { LightConsoleView } from "../../../shared/components/light-console/LightConsoleView";
 import { ProjectorMediaPreview } from "../../projector/ui/ProjectorMediaPreview";
 import { resolveDefaultHoldId } from "../../projector/model/projector-media";
+import { useSpectacleRunContext } from "../model/spectacle-run-context";
+import {
+  isLiveProjectorVideo,
+  SpectacleRunProjectorFollowPlayer,
+} from "./SpectacleRunProjectorFollowPlayer";
 import { formatKadrRunLabelText, type KadrRunLabel } from "../model/kadr-section-labels";
 import type { KadrStripTechRow } from "../model/kadr-strip-tech-summary";
 import {
@@ -45,6 +50,7 @@ export function SpectacleRunKadrStripProgRunChip({
   lightConsoleChannelColumns,
   sceneSpotlights = [],
 }: SpectacleRunKadrStripProgRunChipProps) {
+  const run = useSpectacleRunContext();
   const [requisitesOpen, setRequisitesOpen] = useState(false);
   const { imageSrc, onImageError, hasThumb, fallbackColor, chipAccentStyle } =
     useKadrStripChipImage(
@@ -121,6 +127,13 @@ export function SpectacleRunKadrStripProgRunChip({
     (projectorPreview.mode === "video"
       ? projectorPreview.videoId != null && projectorPreview.videoId > 0
       : true);
+  const liveCoverVideoId =
+    active &&
+    projectorPreview?.mode === "video" &&
+    projectorPreview.videoId != null &&
+    isLiveProjectorVideo(projectorPreview.videoId, run.projectorPlayback)
+      ? projectorPreview.videoId
+      : null;
 
   const handleChipKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== "Enter" && event.key !== " ") return;
@@ -185,6 +198,7 @@ export function SpectacleRunKadrStripProgRunChip({
         row={row}
         projectorCtx={projectorCtx}
         hideProjectorPreview={showProjectorCover}
+        liveEnabled={active}
       />
     </span>
   );
@@ -216,7 +230,7 @@ export function SpectacleRunKadrStripProgRunChip({
             showPlainCover && "spectacle-run-kadr-strip__chip-cover--plain",
             (showImageCover || showProjectorCover) && "spectacle-run-kadr-strip__chip-cover--thumb",
           )}
-          aria-hidden
+          aria-hidden={liveCoverVideoId == null ? true : undefined}
         >
           {showImageCover ? (
             <img
@@ -224,6 +238,12 @@ export function SpectacleRunKadrStripProgRunChip({
               alt=""
               className="spectacle-run-kadr-strip__chip-cover-img"
               onError={onImageError}
+            />
+          ) : liveCoverVideoId != null ? (
+            <SpectacleRunProjectorFollowPlayer
+              videoId={liveCoverVideoId}
+              variant="cover"
+              className="spectacle-run-kadr-strip__chip-cover-preview"
             />
           ) : showProjectorCover && projectorPreview && projectorCtx ? (
             <ProjectorMediaPreview

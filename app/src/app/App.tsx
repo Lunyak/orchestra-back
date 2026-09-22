@@ -57,6 +57,7 @@ function AuthenticatedApp({ onAfterLogin }: { onAfterLogin?: (token: string) => 
     return (
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/download" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage onAfterLogin={onAfterLogin} />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />

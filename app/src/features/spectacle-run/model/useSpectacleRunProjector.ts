@@ -165,17 +165,21 @@ export function useSpectacleRunProjector({
   );
 
   const playProjectorCue = useCallback(
-    async (cue: KadrProjectorCue, statusLabel?: string) => {
+    async (
+      cue: KadrProjectorCue,
+      statusLabel?: string,
+      playback?: { startTime?: number; paused?: boolean },
+    ) => {
       setProjectorDraft(cue);
-      if (!(await ensureProjectorOpen())) return;
-      await applyKadrProjector(
-        cue,
-        projectorMediaCtx,
-        resolveKadrProjectorVideoOptions(cue, {
+      if (!(await ensureProjectorOpen())) return false;
+      await applyKadrProjector(cue, projectorMediaCtx, {
+        ...resolveKadrProjectorVideoOptions(cue, {
           resolveMuted: resolveProjectorVideoMuted,
           resolveVolume: resolveProjectorVideoVolume,
         }),
-      );
+        startTime: playback?.startTime,
+        paused: playback?.paused,
+      });
       const holdLabel =
         cue.mode === "hold" && cue.holdId != null
           ? holdImages.find((h) => Number(h.id) === cue.holdId)?.title?.trim() ||
@@ -187,6 +191,7 @@ export function useSpectacleRunProjector({
             ? `Проектор: ${holdLabel} — окно на втором экране, F11 для полного экрана`
             : "Проектор: видео — окно на втором экране, F11 для полного экрана"),
       );
+      return true;
     },
     [
       ensureProjectorOpen,
@@ -199,12 +204,13 @@ export function useSpectacleRunProjector({
   );
 
   const playProjectorVideo = useCallback(
-    (videoId: number) => {
+    (videoId: number, playback?: { startTime?: number; paused?: boolean }) => {
       const video = videos.find((v) => Number(v.id) === Number(videoId));
       const label = video?.title?.trim() || `видео ${videoId}`;
-      void playProjectorCue(
+      return playProjectorCue(
         { mode: "video", videoId },
         `▶ ${label} — на проекторе. Перенесите окно на 2-й экран, F11`,
+        playback,
       );
     },
     [playProjectorCue, videos],

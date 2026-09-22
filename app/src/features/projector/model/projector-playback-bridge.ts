@@ -4,7 +4,7 @@ export type ProjectorShowHold = {
   type: "show-hold";
   /** Локальный/offline URL, если нет storageKey (не blob: из другого окна). */
   src: string | null;
-  /** Ключ в хранилище — окно проектора само грузит через /files/stream */
+  /** Ключ в хранилище — окно проектора само берёт play-url или stream */
   storageKey: string | null;
   holdId: number | null;
   /** Имя файла для локального кэша в окне проектора (folder picker). */
@@ -27,6 +27,8 @@ export type ProjectorShowVideo = {
   muted?: boolean;
   volume?: number;
   fadeMs?: number;
+  startTime?: number;
+  paused?: boolean;
 };
 export type ProjectorBlack = { type: "black"; fadeMs?: number };
 export type ProjectorReady = { type: "ready" };
@@ -223,19 +225,36 @@ export async function ensureProjectorOutputOpen(
   return waitForProjectorOutputReady();
 }
 
+const PROJECTOR_WINDOW_NAME = "orchestra-projector";
+
+function attachExistingProjectorWindow(): Window | null {
+  if (projectorWindow != null && !projectorWindow.closed) return projectorWindow;
+
+  const existing = window.open("", PROJECTOR_WINDOW_NAME);
+  if (existing == null || existing.closed) return null;
+  try {
+    const href = existing.location.href;
+    if (!href || href === "about:blank") return null;
+  } catch {
+    return existing;
+  }
+  return existing;
+}
+
 export function openProjectorWindow(options?: OpenProjectorWindowOptions): Window | null {
   const shouldFocus = options?.focus !== false;
-
-  if (projectorWindow != null && !projectorWindow.closed) {
-    if (shouldFocus) projectorWindow.focus();
+  const existing = attachExistingProjectorWindow();
+  if (existing) {
+    projectorWindow = existing;
     markProjectorOutputReachable(true);
-    return projectorWindow;
+    if (shouldFocus) existing.focus();
+    return existing;
   }
 
   const url = buildProjectorOutputUrl();
   projectorWindow = window.open(
     url,
-    "orchestra-projector",
+    PROJECTOR_WINDOW_NAME,
     "menubar=no,toolbar=no,location=no,status=no",
   );
 

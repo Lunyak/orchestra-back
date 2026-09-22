@@ -18,9 +18,11 @@ services:
       - ./back/prisma.config.ts:/app/prisma.config.ts
       - ./back/package.json:/app/package.json
       - ./back/package-lock.json:/app/package-lock.json
+      - ./desktop/release:/app/data/desktop-releases:ro
       - /app/node_modules
     environment:
       NODE_ENV: development
+      DESKTOP_RELEASES_DIR: /app/data/desktop-releases
       CHOKIDAR_USEPOLLING: "true"
       WATCHPACK_POLLING: "true"
       S3_ENDPOINT: http://minio:9000

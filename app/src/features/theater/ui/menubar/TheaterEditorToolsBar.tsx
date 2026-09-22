@@ -16,9 +16,31 @@ export function TheaterEditorToolsBar({
   const dutyLightEnabled = vm.dutyLightEnabled;
   const smokeMachineEnabled = vm.smokeMachineEnabled;
   const smokePanelOpen = vm.smokePanelOpen;
+  const hasModels = vm.models.length > 0;
+  const canCopyToPrevious = Boolean(vm.currentScene) && vm.currentPage > 0 && hasModels;
+  const canCopyToNext =
+    Boolean(vm.currentScene) && vm.currentPage < vm.sceneCount - 1 && hasModels;
 
   return (
     <div className="theater-scene-tools-bar" aria-label="Инструменты 3D театра">
+      <button
+        type="button"
+        className="theater-scene-tools-bar__btn"
+        disabled={!canCopyToPrevious}
+        title="Заменить модели предыдущей сцены копией текущей с теми же координатами"
+        onClick={() => vm.copyModelsToAdjacentScene("previous")}
+      >
+        Копия ←
+      </button>
+      <button
+        type="button"
+        className="theater-scene-tools-bar__btn"
+        disabled={!canCopyToNext}
+        title="Заменить модели следующей сцены копией текущей с теми же координатами"
+        onClick={() => vm.copyModelsToAdjacentScene("next")}
+      >
+        Копия →
+      </button>
       <button
         type="button"
         className={cn(

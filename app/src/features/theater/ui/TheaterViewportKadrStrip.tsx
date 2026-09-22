@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { usePlaybook } from "../../playbook";
 import { findKadrById, readSceneLightKadrs } from "../model/light-kadrs";
 import { applyKadrLook } from "../model/kadr-store";
 import { buildTheaterSnapshotScenePatch } from "../model/kadr-theater-snapshot";
+import { clampKadrStripHeight } from "../model/theater-view-prefs-storage";
 import { resolveLightFaders } from "../../../shared/components/light-console/light-console-data";
 import {
   buildSpectacleKadrTape,
@@ -22,6 +23,7 @@ export function TheaterViewportKadrStrip({ vm }: TheaterViewportKadrStripProps) 
   const { scenes, playbookData, setPlaybookData, updateScene, setCurrentPage } = usePlaybook();
   const tape = useMemo(() => buildSpectacleKadrTape(scenes), [scenes]);
   const [tapeIndex, setTapeIndex] = useState(0);
+  const resizeRef = useRef<{ startY: number; startHeight: number } | null>(null);
 
   const lightChannels = useMemo(
     () => (Array.isArray(playbookData?.lightChannels) ? playbookData.lightChannels : []),
@@ -77,10 +79,45 @@ export function TheaterViewportKadrStrip({ vm }: TheaterViewportKadrStripProps) 
     }
   };
 
+  const handleResizePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    resizeRef.current = {
+      startY: event.clientY,
+      startHeight: vm.kadrStripHeight,
+    };
+  };
+
+  const handleResizePointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = resizeRef.current;
+    if (!drag) return;
+    const delta = drag.startY - event.clientY;
+    vm.setKadrStripHeight(clampKadrStripHeight(drag.startHeight + delta));
+  };
+
+  const handleResizePointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!resizeRef.current) return;
+    resizeRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
   if (tape.length === 0) return null;
 
   return (
     <div className="theater-viewport-kadr-strip">
+      <button
+        type="button"
+        className="theater-viewport-kadr-strip-resize"
+        aria-label="Изменить высоту ленты сцен"
+        title="Потянуть для изменения высоты"
+        onPointerDown={handleResizePointerDown}
+        onPointerMove={handleResizePointerMove}
+        onPointerUp={handleResizePointerUp}
+        onPointerCancel={handleResizePointerUp}
+      />
       <SpectacleRunKadrStrip
         variant="rehearsal"
         projectName={vm.projectName}

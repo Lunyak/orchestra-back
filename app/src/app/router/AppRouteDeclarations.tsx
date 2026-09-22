@@ -6,6 +6,7 @@ import {
   ENABLE_ACTOR_PAGE,
   ENABLE_ROLE_WORKBOOK_PAGE,
 } from "../../shared/build-features";
+import { LandingPage } from "../../pages/landing/LandingPage";
 import { organizationRoutes } from "./organization-routes";
 import { DEFAULT_APP_PATH, globalPaths } from "./paths";
 import { projectRoutes } from "./project-routes";
@@ -193,6 +194,7 @@ export function AppRouteDeclarations() {
 
       <Route path="/privacy" element={<PrivacyPage />} />
       <Route path="/terms" element={<TermsPage />} />
+      <Route path="/download" element={<LandingPage />} />
       <Route path="/" element={<Navigate to={DEFAULT_APP_PATH} replace />} />
       <Route path="*" element={<RouteNotFoundPage />} />
     </Routes>

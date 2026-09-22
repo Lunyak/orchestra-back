@@ -1,5 +1,6 @@
 import { dispatchSyncPush } from "../shared/api/rtk/sync-dispatch";
 import type { SyncChange } from "./api/types/sync";
+import { sceneTheaterSyncPayload } from "../features/theater/model/theater-scene-models";
 import { mapTheaterSpotlightToSync } from "../features/theater/model/theater-light-fader-bindings";
 import { ensureProject } from "./api/projects";
 import { getDesktopApi } from "../shared/platform/desktop-api";
@@ -274,7 +275,7 @@ export async function flushDesktopOutbox(
         lightPlot: Array.isArray(scene?.lightPlot) ? scene.lightPlot : [],
         lightCues: Array.isArray(scene?.lightCues) ? scene.lightCues : [],
         lightKadrs: scene?.lightKadrs ?? null,
-        theaterModels: Array.isArray(scene?.theaterModels) ? scene.theaterModels : [],
+        ...sceneTheaterSyncPayload(scene),
         theaterSpotlights: Array.isArray(scene?.theaterSpotlights)
           ? scene.theaterSpotlights.map((sp: TheaterSpotlight) =>
               mapTheaterSpotlightToSync(sp),

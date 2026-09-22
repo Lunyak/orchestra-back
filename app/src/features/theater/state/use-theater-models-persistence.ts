@@ -15,8 +15,8 @@ import {
 } from "../model/theater-scene-models";
 import { isLightTrussModel, syncMountedSpotlights } from "../model/theater-truss-mounts";
 import { setLightTrussHeight } from "../model/theater-light-rig";
+import { buildCopiedTheaterScenePatch } from "../model/theater-copy-set";
 import {
-  appendClonedTheaterModels,
   cloneTheaterModels,
   resolveAdjacentSceneIndex,
   type TheaterAdjacentSceneDirection,
@@ -208,15 +208,24 @@ export function useTheaterModelsPersistence({
       setDecorActionMessage("Нет моделей для копирования");
       return;
     }
-    const existing = readSceneTheaterModels(targetScene);
-    const nextModels = appendClonedTheaterModels(existing, source);
-    const copiedCount = nextModels.length - existing.length;
-    updateScene(targetScene.id, writeSceneTheaterModels(nextModels));
+    const replaceAll = modelIds == null;
+    const { patch, appliedCategories } = buildCopiedTheaterScenePatch({
+      targetScene,
+      sourceModels: source,
+      sourceSpotlights: [],
+      categories: ["furniture", "decor"],
+      mode: replaceAll ? "replace" : "append",
+      layout,
+      skipEmptyCategories: !replaceAll,
+    });
+    if (appliedCategories.length === 0) {
+      setDecorActionMessage("Нет моделей для копирования");
+      return;
+    }
+    updateScene(targetScene.id, patch);
     const scope = modelIds == null ? "Все модели" : "Модели";
     const targetTitle = targetScene.title?.trim() || `сцена ${targetIndex + 1}`;
-    setDecorActionMessage(
-      `${scope} скопированы на «${targetTitle}» (${copiedCount})`,
-    );
+    setDecorActionMessage(`${scope} скопированы на «${targetTitle}»`);
   };
 
   return {

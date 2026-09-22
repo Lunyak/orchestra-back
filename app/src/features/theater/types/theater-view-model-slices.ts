@@ -21,6 +21,7 @@ export type TheaterPrefsSlice = TheaterViewPrefs & {
   setWallsHideFromCamera: (value: boolean) => void;
   setShowFloorPlan: (value: boolean) => void;
   setFloorPlanMaxSide: Dispatch<SetStateAction<number>>;
+  setKadrStripHeight: Dispatch<SetStateAction<number>>;
   setSpectaclePreviewMode: (value: boolean) => void;
   setAlignGuidesEnabled: (value: boolean) => void;
   setActiveTab: (tab: TheaterViewPrefs["activeTab"]) => void;

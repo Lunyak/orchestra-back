@@ -20,9 +20,11 @@ services:
       # /app/node_modules залипает на старых пакетах после добавления зависимостей (без ручного docker volume rm).
       - ./back/package.json:/app/package.json
       - ./back/package-lock.json:/app/package-lock.json
+      - ./desktop/release:/app/data/desktop-releases:ro
       - /app/node_modules
     environment:
       NODE_ENV: development
+      DESKTOP_RELEASES_DIR: /app/data/desktop-releases
       # Пресайнд URL для браузера на хосте; внутри сети compose — minio:9000
       S3_ENDPOINT: http://minio:9000
       S3_PUBLIC_URL: http://localhost:9000

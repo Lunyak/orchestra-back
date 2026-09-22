@@ -37,6 +37,16 @@ export function contentTypeForExtension(ext: string): string {
       return 'model/gltf-binary';
     case '.gltf':
       return 'model/gltf+json';
+    case '.zip':
+      return 'application/zip';
+    case '.dmg':
+      return 'application/x-apple-diskimage';
+    case '.exe':
+    case '.msi':
+    case '.appimage':
+    case '.deb':
+    case '.rpm':
+      return 'application/octet-stream';
     default:
       return 'application/octet-stream';
   }

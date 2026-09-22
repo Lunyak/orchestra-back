@@ -46,6 +46,7 @@ export type UseTheaterViewPrefsResult = TheaterViewPrefs & {
   setWallsHideFromCamera: (value: boolean) => void;
   setShowFloorPlan: (value: boolean) => void;
   setFloorPlanMaxSide: Dispatch<SetStateAction<number>>;
+  setKadrStripHeight: Dispatch<SetStateAction<number>>;
   setSpectaclePreviewMode: (value: boolean) => void;
   setAlignGuidesEnabled: (value: boolean) => void;
   setActiveTab: (tab: TheaterViewPrefs["activeTab"]) => void;
@@ -108,6 +109,9 @@ export function useTheaterViewPrefs(
   );
   const [floorPlanMaxSide, setFloorPlanMaxSide] = useState(
     () => readTheaterViewPrefs(projectName).floorPlanMaxSide,
+  );
+  const [kadrStripHeight, setKadrStripHeight] = useState(
+    () => readTheaterViewPrefs(projectName).kadrStripHeight,
   );
   const [spectaclePreviewMode, setSpectaclePreviewMode] = useState(
     () => readTheaterViewPrefs(projectName).spectaclePreviewMode,
@@ -191,6 +195,7 @@ export function useTheaterViewPrefs(
     setWallsHideFromCamera(prefs.wallsHideFromCamera);
     setShowFloorPlan(prefs.showFloorPlan);
     setFloorPlanMaxSide(prefs.floorPlanMaxSide);
+    setKadrStripHeight(prefs.kadrStripHeight);
     setSpectaclePreviewMode(prefs.spectaclePreviewMode);
     setAlignGuidesEnabled(prefs.alignGuidesEnabled);
     setActiveTab(prefs.activeTab);
@@ -264,6 +269,7 @@ export function useTheaterViewPrefs(
       wallsHideFromCamera,
       showFloorPlan,
       floorPlanMaxSide,
+      kadrStripHeight,
       spectaclePreviewMode,
       alignGuidesEnabled,
       activeTab,
@@ -296,6 +302,7 @@ export function useTheaterViewPrefs(
     wallsHideFromCamera,
     showFloorPlan,
     floorPlanMaxSide,
+    kadrStripHeight,
     spectaclePreviewMode,
     alignGuidesEnabled,
     activeTab,
@@ -328,6 +335,7 @@ export function useTheaterViewPrefs(
     wallsHideFromCamera,
     showFloorPlan,
     floorPlanMaxSide,
+    kadrStripHeight,
     spectaclePreviewMode,
     alignGuidesEnabled,
     activeTab,
@@ -358,6 +366,7 @@ export function useTheaterViewPrefs(
     setWallsHideFromCamera,
     setShowFloorPlan,
     setFloorPlanMaxSide,
+    setKadrStripHeight,
     setSpectaclePreviewMode,
     setAlignGuidesEnabled,
     setActiveTab,

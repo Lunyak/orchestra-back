@@ -87,11 +87,11 @@ export function AppEditorMenubar() {
             <AppEditorHomeLink />
             {viewMenu}
           </div>
+          {projectName && isProjectRoute ? <AppEditorMenubarProjectSelect /> : null}
         </div>
-        {(projectName && isProjectRoute) || centerContent ? (
+        {centerContent ? (
           <div className="app-editor-menubar__center">
             {centerContent}
-            {projectName && isProjectRoute ? <AppEditorMenubarProjectSelect /> : null}
           </div>
         ) : null}
         <div className="app-editor-menubar__player">

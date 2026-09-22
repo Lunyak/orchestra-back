@@ -21,12 +21,6 @@ export function DownloadProjectorMediaButton({
   const desktop = isDesktopApp();
 
   const handleClick = useCallback(async () => {
-    if (!desktop) {
-      const message = "Откройте приложение через npm run dev:desktop (окно Electron, не браузер)";
-      setLastMessage(message);
-      onStatus?.(message);
-      return;
-    }
     setBusy(true);
     setProgressLabel(null);
     setLastMessage(null);
@@ -44,7 +38,9 @@ export function DownloadProjectorMediaButton({
       setBusy(false);
       setProgressLabel(null);
     }
-  }, [desktop, downloadProjectorMediaForOffline, onStatus]);
+  }, [downloadProjectorMediaForOffline, onStatus]);
+
+  if (!desktop) return null;
 
   return (
     <div className={className ?? "download-projector-media"}>
@@ -53,11 +49,7 @@ export function DownloadProjectorMediaButton({
         className={buttonClassName ?? "download-projector-media__btn"}
         disabled={busy}
         onClick={() => void handleClick()}
-        title={
-          desktop
-            ? "Сохранить все видео и заставки в папку проекта для работы без интернета"
-            : "Доступно только в десктоп-приложении Electron"
-        }
+        title="Сохранить все видео и заставки в папку проекта для работы без интернета"
       >
         {busy ? (progressLabel ? `Загрузка: ${progressLabel}` : "Скачивание…") : "Скачать видео локально"}
       </button>

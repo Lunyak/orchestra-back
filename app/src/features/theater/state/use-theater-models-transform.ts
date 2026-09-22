@@ -59,6 +59,7 @@ type UseTheaterModelsTransformArgs = {
   setActiveModelSizeTick: Dispatch<SetStateAction<number>>;
   pendingSnapModelId: number | null;
   setPendingSnapModelId: Dispatch<SetStateAction<number | null>>;
+  sceneId?: number;
 };
 
 export function useTheaterModelsTransform({
@@ -87,10 +88,12 @@ export function useTheaterModelsTransform({
   setActiveModelSizeTick,
   pendingSnapModelId,
   setPendingSnapModelId,
+  sceneId,
 }: UseTheaterModelsTransformArgs) {
   const modelTransformEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
+  const modelTransformActiveRef = useRef(false);
   const modelDragLastValidRef = useRef<{
     position: [number, number, number];
     rotation: [number, number, number];
@@ -108,6 +111,10 @@ export function useTheaterModelsTransform({
   >(null);
   const modelObjectMapRef = useRef<Map<number, THREE.Object3D>>(new Map());
 
+  useEffect(() => {
+    modelObjectMapRef.current.clear();
+  }, [sceneId]);
+
   const clearModelTransformEndTimer = useCallback(() => {
     if (modelTransformEndTimerRef.current == null) return;
     clearTimeout(modelTransformEndTimerRef.current);
@@ -116,16 +123,26 @@ export function useTheaterModelsTransform({
 
   const handleActiveObjectChange = useCallback(
     (node: THREE.Object3D | null, id: number) => {
-      setActiveModelObject(node);
-      setActiveModelObjectId(node ? id : null);
+      if (node) {
+        setActiveModelObject(node);
+        setActiveModelObjectId(id);
+        return;
+      }
+      setActiveModelObjectId((current) => {
+        if (current !== id) return current;
+        setActiveModelObject(null);
+        return null;
+      });
     },
-    [],
+    [setActiveModelObject, setActiveModelObjectId],
   );
 
   const handleObjectReady = useCallback((node: THREE.Object3D | null, id: number) => {
     if (node) {
       modelObjectMapRef.current.set(id, node);
-    } else {
+      return;
+    }
+    if (modelObjectMapRef.current.get(id)) {
       modelObjectMapRef.current.delete(id);
     }
   }, []);
@@ -228,6 +245,7 @@ export function useTheaterModelsTransform({
   ]);
 
   const handleModelTransformChange = useCallback(() => {
+    modelTransformActiveRef.current = true;
     if (!historyTransactionRef.current) {
       beginTheaterHistoryTransaction();
       const prevModel = activeModelId
@@ -259,6 +277,8 @@ export function useTheaterModelsTransform({
   ]);
 
   const handleModelTransformEnd = useCallback(() => {
+    if (!modelTransformActiveRef.current) return;
+    modelTransformActiveRef.current = false;
     clearModelTransformEndTimer();
     if (historyTransactionRef.current) {
       persistActiveModel();
@@ -274,6 +294,7 @@ export function useTheaterModelsTransform({
   }, [clearModelTransformEndTimer, endTheaterHistoryTransaction, persistActiveModel]);
 
   const handleModelTransformStart = useCallback(() => {
+    modelTransformActiveRef.current = true;
     clearModelTransformEndTimer();
     if (!historyTransactionRef.current) {
       beginTheaterHistoryTransaction();
@@ -338,6 +359,15 @@ export function useTheaterModelsTransform({
   ]);
 
   useEffect(() => () => clearModelTransformEndTimer(), [clearModelTransformEndTimer]);
+
+  useEffect(() => {
+    window.addEventListener("pointerup", handleModelTransformEnd);
+    window.addEventListener("blur", handleModelTransformEnd);
+    return () => {
+      window.removeEventListener("pointerup", handleModelTransformEnd);
+      window.removeEventListener("blur", handleModelTransformEnd);
+    };
+  }, [handleModelTransformEnd]);
 
   useEffect(() => {
     if (!pendingSnapModelId) return;

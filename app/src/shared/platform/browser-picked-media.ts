@@ -165,21 +165,48 @@ async function idbSet(key: string, value: unknown): Promise<void> {
   });
 }
 
+async function idbDelete(key: string): Promise<void> {
+  const db = await openMediaDb();
+  await new Promise<void>((resolve) => {
+    const tx = db.transaction("kv", "readwrite");
+    tx.objectStore("kv").delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
+}
+
 async function walkDirectoryFiles(
   handle: FileSystemDirectoryHandle,
   depth: number,
   maxDepth: number,
   onFile: (file: File) => void,
 ): Promise<void> {
-  for await (const entry of handle.values()) {
-    if (entry.kind === "file") {
-      const fileHandle = entry as FileSystemFileHandle;
-      onFile(await fileHandle.getFile());
-      continue;
+  try {
+    for await (const entry of handle.values()) {
+      if (entry.kind === "file") {
+        try {
+          const fileHandle = entry as FileSystemFileHandle;
+          onFile(await fileHandle.getFile());
+        } catch {
+          /* файл успели удалить или переименовать */
+        }
+        continue;
+      }
+      if (entry.kind === "directory" && depth < maxDepth) {
+        try {
+          await walkDirectoryFiles(
+            entry as FileSystemDirectoryHandle,
+            depth + 1,
+            maxDepth,
+            onFile,
+          );
+        } catch {
+          /* подпапка недоступна */
+        }
+      }
     }
-    if (entry.kind === "directory" && depth < maxDepth) {
-      await walkDirectoryFiles(entry as FileSystemDirectoryHandle, depth + 1, maxDepth, onFile);
-    }
+  } catch {
+    /* сама папка уже не существует */
   }
 }
 
@@ -277,7 +304,7 @@ export async function pickBrowserMediaFolder(projectSlug: string): Promise<Brows
     }
     await idbSet(handleKey(projectSlug), handle);
     activeProjectSlug = projectSlug;
-    return scanDirectoryHandle(projectSlug, handle);
+    return await scanDirectoryHandle(projectSlug, handle);
   } catch (err) {
     if ((err as Error).name === "AbortError") {
       return { ok: false, videos: [], holdImages: [], error: "Выбор папки отменён" };
@@ -305,13 +332,16 @@ export async function restoreBrowserMediaFolder(projectSlug: string): Promise<Br
       return { ok: false, videos: [], holdImages: [], error: "Нет доступа к папке" };
     }
     activeProjectSlug = projectSlug;
-    return scanDirectoryHandle(projectSlug, handle);
+    return await scanDirectoryHandle(projectSlug, handle);
   } catch (err) {
+    if ((err as Error).name === "NotFoundError") {
+      await idbDelete(handleKey(projectSlug));
+    }
     return {
       ok: false,
       videos: [],
       holdImages: [],
-      error: String((err as Error)?.message ?? err),
+      error: "Локальная папка больше недоступна — видео возьмём с сервера",
     };
   }
 }

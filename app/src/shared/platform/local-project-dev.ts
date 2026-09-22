@@ -19,7 +19,7 @@ const localJsonSingleflight = createSingleflight<
 const scanMediaSingleflight = createSingleflight<[string], DevScannedMedia>();
 
 export function isDevLocalProjectsEnabled(): boolean {
-  return Boolean(import.meta.env.DEV);
+  return Boolean(import.meta.env?.DEV);
 }
 
 export function localProjectMediaDevUrl(

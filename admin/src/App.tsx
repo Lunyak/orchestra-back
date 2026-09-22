@@ -1219,6 +1219,7 @@ function SiteEventsCrudPage() {
                     const next = (selected.photos ?? []).filter((_, i) => i !== index);
                     updateSelected({ photos: next });
                   }}
+                  onReorder={(photos) => updateSelected({ photos })}
                 />
               </div>
 
