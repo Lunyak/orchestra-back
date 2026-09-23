@@ -8,6 +8,7 @@ import { GltfGuard } from "./GltfGuard";
 import { resolveDecorMaterialSide } from "../../model/theater-decor-material";
 import {
   createDecorPresetCanvas,
+  getDecorPresetImagePath,
   getDecorTexturePresetId,
   resolveDecorTextureSrc,
 } from "../../model/theater-decor-textures";
@@ -141,7 +142,13 @@ function TheaterAssetLibraryModelInner({
     };
 
     const presetId = getDecorTexturePresetId(model.decorTexture);
-    if (presetId) {
+    const presetImagePath = presetId ? getDecorPresetImagePath(presetId) : null;
+    if (presetImagePath) {
+      applyAssetAppearance(scene, model, null);
+      new THREE.TextureLoader().load(resolvePublicAssetUrl(presetImagePath), (loadedTexture) =>
+        applyTexture(configureTexture(loadedTexture, model)),
+      );
+    } else if (presetId) {
       applyTexture(
         configureTexture(
           new THREE.CanvasTexture(createDecorPresetCanvas(presetId)),

@@ -2,8 +2,10 @@ import { useTexture } from "@react-three/drei";
 import { Suspense, useEffect, useMemo } from "react";
 import * as THREE from "three";
 import type { TheaterModel } from "../../../../shared/types/script";
+import { resolvePublicAssetUrl } from "../../../../shared/utils/public-asset-url";
 import {
   createDecorPresetCanvas,
+  getDecorPresetImagePath,
   getDecorTexturePresetId,
   resolveDecorTextureMapping,
   resolveDecorTextureSrc,
@@ -167,7 +169,39 @@ export function DecorTexturedMaterial({
   side,
 }: DecorTexturedMaterialProps) {
   const presetId = getDecorTexturePresetId(model.decorTexture);
+  const presetImagePath = presetId ? getDecorPresetImagePath(presetId) : null;
+  const presetImageSrc = presetImagePath ? resolvePublicAssetUrl(presetImagePath) : null;
   const fileSrc = presetId ? null : resolveDecorTextureSrc(projectName, model.decorTexture);
+
+  if (presetImageSrc) {
+    return (
+      <Suspense
+        fallback={
+          <SolidDecorMaterial
+            model={model}
+            color={color}
+            tone={tone}
+            opacity={opacity}
+            transparent={transparent}
+            side={side}
+          />
+        }
+      >
+        <FileDecorMaterial
+          src={presetImageSrc}
+          projectName={projectName}
+          model={model}
+          surfaceWidth={surfaceWidth}
+          surfaceHeight={surfaceHeight}
+          color={color}
+          tone={tone}
+          opacity={opacity}
+          transparent={transparent}
+          side={side}
+        />
+      </Suspense>
+    );
+  }
 
   if (presetId) {
     return (

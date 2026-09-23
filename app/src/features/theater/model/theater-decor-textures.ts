@@ -6,6 +6,7 @@ import {
 
 export type DecorTexturePresetId =
   | "velvet"
+  | "velour-velvet"
   | "canvas-beige"
   | "wood-oak"
   | "concrete-gray";
@@ -86,10 +87,19 @@ export type DecorTexturePreset = {
 
 export const DECOR_TEXTURE_PRESETS: DecorTexturePreset[] = [
   { id: "velvet", label: "Бархат" },
+  { id: "velour-velvet", label: "Велюр" },
   { id: "canvas-beige", label: "Холст" },
   { id: "wood-oak", label: "Дерево" },
   { id: "concrete-gray", label: "Бетон" },
 ];
+
+const DECOR_TEXTURE_PRESET_IMAGES: Partial<Record<DecorTexturePresetId, string>> = {
+  "velour-velvet": "theater/textures/velour-velvet.jpg",
+};
+
+export function getDecorPresetImagePath(id: DecorTexturePresetId): string | null {
+  return DECOR_TEXTURE_PRESET_IMAGES[id] ?? null;
+}
 
 export const DECOR_TEXTURE_PRESET_PREFIX = "preset:" as const;
 export const DECOR_TEXTURE_FILE_PREFIX = "file:" as const;
@@ -99,6 +109,7 @@ export function getDecorTexturePresetId(
 ): DecorTexturePresetId | null {
   if (!value?.startsWith(DECOR_TEXTURE_PRESET_PREFIX)) return null;
   const raw = value.slice(DECOR_TEXTURE_PRESET_PREFIX.length);
+  if (raw === "velour-velvet") return "velour-velvet";
   if (raw === "velvet" || LEGACY_VELVET_PRESET_IDS.has(raw)) return "velvet";
   if (raw === "canvas-beige" || raw === "wood-oak" || raw === "concrete-gray") {
     return raw;
@@ -232,7 +243,10 @@ export function createDecorPresetCanvas(presetId: DecorTexturePresetId): HTMLCan
   const ctx = canvas.getContext("2d");
   if (!ctx) return canvas;
 
-  if (presetId.startsWith("velvet")) {
+  if (presetId === "velour-velvet") {
+    ctx.fillStyle = "#5c1824";
+    ctx.fillRect(0, 0, size, size);
+  } else if (presetId.startsWith("velvet")) {
     drawVelvet(ctx, size);
   } else if (presetId === "canvas-beige") {
     drawCanvas(ctx, size);

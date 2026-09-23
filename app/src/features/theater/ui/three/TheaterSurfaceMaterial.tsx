@@ -2,8 +2,10 @@ import { useTexture } from "@react-three/drei";
 import { Suspense, useEffect, useMemo } from "react";
 import * as THREE from "three";
 import type { TheaterSurfaceMaterial as TheaterSurfaceMaterialConfig } from "../../../../shared/types/script";
+import { resolvePublicAssetUrl } from "../../../../shared/utils/public-asset-url";
 import {
   createDecorPresetCanvas,
+  getDecorPresetImagePath,
   getDecorTexturePresetId,
   resolveDecorTextureMapping,
   resolveDecorTextureSrc,
@@ -148,7 +150,38 @@ export function TheaterSurfaceMaterial({
   side,
 }: TheaterSurfaceMaterialProps) {
   const presetId = getDecorTexturePresetId(material?.texture);
+  const presetImagePath = presetId ? getDecorPresetImagePath(presetId) : null;
+  const presetImageSrc = presetImagePath ? resolvePublicAssetUrl(presetImagePath) : null;
   const fileSrc = presetId ? null : resolveDecorTextureSrc(projectName, material?.texture);
+
+  if (presetImageSrc) {
+    return (
+      <Suspense
+        fallback={
+          <meshStandardMaterial
+            color={material?.color ?? fallbackColor}
+            roughness={0.86}
+            metalness={0.04}
+            transparent={transparent || (opacity ?? 1) < 1}
+            opacity={opacity ?? 1}
+            side={side}
+          />
+        }
+      >
+        <FileSurfaceMaterial
+          projectName={projectName}
+          material={material}
+          fallbackColor={fallbackColor}
+          surfaceWidth={surfaceWidth}
+          surfaceHeight={surfaceHeight}
+          src={presetImageSrc}
+          transparent={transparent}
+          opacity={opacity}
+          side={side}
+        />
+      </Suspense>
+    );
+  }
 
   if (presetId) {
     return (

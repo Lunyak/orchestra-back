@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import { resolvePublicAssetUrl } from "../../../shared/utils/public-asset-url";
 import {
   createDecorPresetCanvas,
+  getDecorPresetImagePath,
   getDecorTexturePresetId,
   resolveDecorTextureSrc,
 } from "../model/theater-decor-textures";
@@ -19,11 +21,13 @@ export function DecorTexturePreview({
   label,
 }: DecorTexturePreviewProps) {
   const presetId = getDecorTexturePresetId(textureRef);
+  const presetImagePath = presetId ? getDecorPresetImagePath(presetId) : null;
+  const presetImageSrc = presetImagePath ? resolvePublicAssetUrl(presetImagePath) : null;
   const presetSrc = useMemo(() => {
-    if (!presetId) return null;
+    if (!presetId || presetImageSrc) return null;
     const canvas = createDecorPresetCanvas(presetId);
     return canvas.toDataURL("image/png");
-  }, [presetId]);
+  }, [presetId, presetImageSrc]);
 
   const fileSrc = useMemo(() => {
     if (!textureRef || presetId) return null;
@@ -49,7 +53,7 @@ export function DecorTexturePreview({
     };
   }, [fileSrc]);
 
-  const src = presetSrc ?? loadedFileSrc;
+  const src = presetImageSrc ?? presetSrc ?? loadedFileSrc;
   if (!src && !fallbackColor) return null;
 
   return (
