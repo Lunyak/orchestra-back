@@ -55,8 +55,7 @@ export function groupFurnitureInstances(
   for (const model of models) {
     if (!model.builtin) continue;
     const color = model.decorColor ?? "default";
-    const scaleKey = model.scale.map((value) => value.toFixed(3)).join(",");
-    const key = `${model.builtin}|${color}|${scaleKey}`;
+    const key = `${model.builtin}|${color}`;
     const existing = map.get(key);
     if (existing) {
       existing.models.push(model);

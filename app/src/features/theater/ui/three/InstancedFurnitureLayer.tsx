@@ -1,6 +1,7 @@
 import { tc } from "../../../../shared/styles/theme-color";
 import { Instances, Instance } from "@react-three/drei";
-import { useMemo } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
+import type { InstancedMesh } from "three";
 import type { ThreeEvent } from "@react-three/fiber";
 import type { TheaterModel } from "../../../../shared/types/script";
 import { resolveDecorColor } from "../../model/theater-decor-catalog";
@@ -40,8 +41,18 @@ function FurnitureInstanceGroup({
   onHoverChange: (id: number | null) => void;
   passThroughPointerEvents?: boolean;
 }) {
+  const meshRef = useRef<InstancedMesh>(null);
   const [width, height, depth] = getFurnitureInstanceGeometry(group.builtin);
   const yOffset = getFurnitureInstanceYOffset(group.builtin);
+
+  useLayoutEffect(() => {
+    const mesh = meshRef.current;
+    return () => {
+      if (!mesh) return;
+      mesh.count = 0;
+      mesh.removeFromParent();
+    };
+  }, []);
   const color =
     group.color !== "default"
       ? group.color
@@ -50,7 +61,11 @@ function FurnitureInstanceGroup({
   const stop = (event: ThreeEvent<PointerEvent | MouseEvent>) => event.stopPropagation();
 
   return (
-    <Instances limit={Math.max(group.models.length, 1)}>
+    <Instances
+      ref={meshRef}
+      limit={Math.max(group.models.length, 1)}
+      range={group.models.length}
+    >
       <boxGeometry args={[width, height, depth]} />
       <meshStandardMaterial color={color} />
       {group.models.map((model) => {

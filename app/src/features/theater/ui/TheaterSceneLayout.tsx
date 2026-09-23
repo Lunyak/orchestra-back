@@ -915,6 +915,7 @@ export function TheaterSceneLayout({
               onModelContextMenu={(id) => onFocusModel(id)}
               onModelHoverChange={vm.setHoveredModelId}
               onModelActivate={(id) => {
+                if (vm.activeModelId === id) return;
                 onSelectModel(id);
                 vm.setModelTransformMode("translate");
                 const model = vm.models.find((item) => item.id === id);

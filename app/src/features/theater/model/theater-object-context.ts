@@ -72,11 +72,35 @@ export const THEATER_PICK_AUDIENCE = "audience";
 export const THEATER_PICK_RECESS = "recess";
 export const THEATER_PICK_OPENING = "opening";
 
-type TheaterRaycastHit = {
-  object: { userData: Record<string, unknown> };
+type TheaterRaycastObject = {
+  userData: Record<string, unknown>;
+  parent?: TheaterRaycastObject | null;
+  isTransformControls?: boolean;
+  isTransformControlsGizmo?: boolean;
+  isTransformControlsPlane?: boolean;
 };
 
+type TheaterRaycastHit = {
+  object: TheaterRaycastObject;
+};
+
+function isTransformGizmoObject(object: TheaterRaycastObject | null | undefined): boolean {
+  let current = object;
+  while (current) {
+    if (
+      current.isTransformControls ||
+      current.isTransformControlsGizmo ||
+      current.isTransformControlsPlane
+    ) {
+      return true;
+    }
+    current = current.parent;
+  }
+  return false;
+}
+
 export function filterTheaterRaycastHits<T extends TheaterRaycastHit>(hits: T[]): T[] {
+  if (hits.some((hit) => isTransformGizmoObject(hit.object))) return [];
   const withoutSurfaces = hits.filter((hit) => {
     const pick = hit.object.userData.theaterPick;
     return pick !== THEATER_PICK_WALL && pick !== THEATER_PICK_FLOOR && pick !== THEATER_PICK_AUDIENCE;

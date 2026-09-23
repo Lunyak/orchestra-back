@@ -50,6 +50,7 @@ export type UseSpectacleRunTapeNavArgs = {
   currentPage: number;
   setCurrentPage: (page: number) => void;
   lightPlotMode: string;
+  kadrPlayback: boolean;
   isProgRun: boolean;
   kadrModalOpen: boolean;
   liveConsole: LiveConsoleLike;
@@ -85,6 +86,7 @@ export function useSpectacleRunTapeNav({
   currentPage,
   setCurrentPage,
   lightPlotMode,
+  kadrPlayback,
   isProgRun,
   kadrModalOpen,
   liveConsole,
@@ -130,8 +132,9 @@ export function useSpectacleRunTapeNav({
       }
 
       const applyPlayback =
-        options?.applyPlayback ??
-        (lightPlotMode === "prog-run" && !progRunPausedRef.current);
+        kadrPlayback &&
+        (options?.applyPlayback ??
+          (lightPlotMode === "prog-run" && !progRunPausedRef.current));
 
       const kadrs = readSceneLightKadrs(scene);
       const kadr = item.kadrId ? findKadrById(kadrs, item.kadrId) : undefined;
@@ -179,6 +182,7 @@ export function useSpectacleRunTapeNav({
     [
       applyingTapeRef,
       ensureProjectorOpen,
+      kadrPlayback,
       lightPlotMode,
       liveConsole,
       progRunPausedRef,

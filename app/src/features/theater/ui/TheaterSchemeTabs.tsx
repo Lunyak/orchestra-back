@@ -71,6 +71,7 @@ export function TheaterSchemeTabs({ children }: TheaterSchemeTabsProps) {
     projectName: projectName ?? "",
     scenes,
     lightChannels,
+    kadrPlayback: false,
   });
 
   return (

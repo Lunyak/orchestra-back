@@ -139,6 +139,10 @@ export function useTheaterModelsTransform({
 
   const handleObjectReady = useCallback((node: THREE.Object3D | null, id: number) => {
     if (node) {
+      const previous = modelObjectMapRef.current.get(id);
+      if (previous && previous !== node) {
+        previous.removeFromParent();
+      }
       modelObjectMapRef.current.set(id, node);
       return;
     }

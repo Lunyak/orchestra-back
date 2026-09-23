@@ -9,9 +9,7 @@ import { roundM } from "../../model/theater-metrics";
 import { followFloorY } from "../../model/theater-stage-floor";
 import {
   measureObjectWorldBox,
-  measureObjectWorldSize,
   resolveTheaterModelWorldSize,
-  type TheaterModelWorldSize,
 } from "../../model/theater-model-world-size";
 
 type MoveSide = "east" | "west" | "south" | "north" | "center";
@@ -35,28 +33,60 @@ type ModelFloorMoveHandlesProps = {
   onDragEnd: () => void;
 };
 
-function resolveFootprint(
+const HANDLE_GAP = 0.18;
+
+type AxisFootprint = {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  minZ: number;
+  maxZ: number;
+};
+
+function fallbackAxisFootprint(model: TheaterModel): AxisFootprint {
+  const measured = resolveTheaterModelWorldSize(model);
+  const width = measured?.width ?? Math.max(0.4, Math.abs(model.scale[0]));
+  const height = measured?.height ?? Math.max(0.4, Math.abs(model.scale[1]));
+  const depth = measured?.depth ?? Math.max(0.4, Math.abs(model.scale[2]));
+  return {
+    minX: -width / 2,
+    maxX: width / 2,
+    minY: 0,
+    maxY: height,
+    minZ: -depth / 2,
+    maxZ: depth / 2,
+  };
+}
+
+function resolveAxisFootprint(
   model: TheaterModel,
   object: THREE.Object3D | null,
-): TheaterModelWorldSize {
+): AxisFootprint {
   if (object) {
-    const worldSize = measureObjectWorldSize(object);
-    if (worldSize) return worldSize;
+    const box = measureObjectWorldBox(object);
+    if (box) {
+      const originX = object.matrixWorld.elements[12];
+      const originY = object.matrixWorld.elements[13];
+      const originZ = object.matrixWorld.elements[14];
+      return {
+        minX: box.min.x - originX,
+        maxX: box.max.x - originX,
+        minY: box.min.y - originY,
+        maxY: box.max.y - originY,
+        minZ: box.min.z - originZ,
+        maxZ: box.max.z - originZ,
+      };
+    }
   }
-  const measured = resolveTheaterModelWorldSize(model);
-  if (measured) return measured;
-  return {
-    width: Math.max(0.4, Math.abs(model.scale[0])),
-    height: Math.max(0.4, Math.abs(model.scale[1])),
-    depth: Math.max(0.4, Math.abs(model.scale[2])),
-  };
+  return fallbackAxisFootprint(model);
 }
 
 /** Центр высоты модели — хэндлы не лежат на полу и не тонут в соседних объектах. */
 function resolveHandlesCenterY(
   model: TheaterModel,
   object: THREE.Object3D | null,
-  footprint: TheaterModelWorldSize,
+  footprint: AxisFootprint,
 ): number {
   if (object) {
     const box = measureObjectWorldBox(object);
@@ -67,7 +97,8 @@ function resolveHandlesCenterY(
       }
     }
   }
-  return Math.max(MIN_HANDLE_Y, model.position[1] + footprint.height * 0.5);
+  const midHeight = (footprint.minY + footprint.maxY) / 2;
+  return Math.max(MIN_HANDLE_Y, model.position[1] + midHeight);
 }
 
 export function ModelFloorMoveHandles({
@@ -96,9 +127,11 @@ export function ModelFloorMoveHandles({
   const pointerNdc = useMemo(() => new THREE.Vector2(), []);
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
 
-  const footprint = resolveFootprint(model, object);
-  const halfW = Math.max(0.25, footprint.width / 2);
-  const halfD = Math.max(0.25, footprint.depth / 2);
+  const footprint = resolveAxisFootprint(model, object);
+  const centerX = (footprint.minX + footprint.maxX) / 2;
+  const centerZ = (footprint.minZ + footprint.maxZ) / 2;
+  const spanX = Math.max(0.35, footprint.maxX - footprint.minX);
+  const spanZ = Math.max(0.35, footprint.maxZ - footprint.minZ);
   const handlesCenterY = resolveHandlesCenterY(model, object, footprint);
   const accent = tc("--color-active-ascent");
   const position = model.position;
@@ -204,6 +237,8 @@ export function ModelFloorMoveHandles({
     window.addEventListener("pointercancel", onUp);
   };
 
+  const barDepth = Math.max(0.45, spanZ);
+  const barWidth = Math.max(0.45, spanX);
   const runners: Array<{
     side: MoveSide;
     position: [number, number, number];
@@ -211,35 +246,36 @@ export function ModelFloorMoveHandles({
   }> = [
     {
       side: "east",
-      position: [halfW + 0.18, 0, 0],
-      scale: [HANDLE_DEPTH, HANDLE_SIZE, Math.min(1.6, footprint.depth * 0.45)],
+      position: [footprint.maxX + HANDLE_GAP, 0, centerZ],
+      scale: [HANDLE_DEPTH, HANDLE_SIZE, barDepth],
     },
     {
       side: "west",
-      position: [-(halfW + 0.18), 0, 0],
-      scale: [HANDLE_DEPTH, HANDLE_SIZE, Math.min(1.6, footprint.depth * 0.45)],
+      position: [footprint.minX - HANDLE_GAP, 0, centerZ],
+      scale: [HANDLE_DEPTH, HANDLE_SIZE, barDepth],
     },
     {
       side: "south",
-      position: [0, 0, halfD + 0.18],
-      scale: [Math.min(1.6, footprint.width * 0.45), HANDLE_SIZE, HANDLE_DEPTH],
+      position: [centerX, 0, footprint.maxZ + HANDLE_GAP],
+      scale: [barWidth, HANDLE_SIZE, HANDLE_DEPTH],
     },
     {
       side: "north",
-      position: [0, 0, -(halfD + 0.18)],
-      scale: [Math.min(1.6, footprint.width * 0.45), HANDLE_SIZE, HANDLE_DEPTH],
+      position: [centerX, 0, footprint.minZ - HANDLE_GAP],
+      scale: [barWidth, HANDLE_SIZE, HANDLE_DEPTH],
     },
   ];
 
   const padSize: [number, number, number] = [
-    Math.max(0.45, footprint.width * 0.55),
+    Math.max(0.45, spanX * 0.55),
     0.04,
-    Math.max(0.45, footprint.depth * 0.55),
+    Math.max(0.45, spanZ * 0.55),
   ];
 
   return (
     <group position={[position[0], handlesCenterY, position[2]]}>
       <mesh
+        position={[centerX, 0, centerZ]}
         renderOrder={20}
         onPointerDown={(event) => beginDrag("center", event)}
       >
@@ -276,7 +312,7 @@ export function ModelFloorMoveHandles({
         );
       })}
 
-      <Billboard position={[0, LABEL_OFFSET_Y, 0]} follow>
+      <Billboard position={[centerX, LABEL_OFFSET_Y, centerZ]} follow>
         <Text
           fontSize={0.18}
           color={accent}

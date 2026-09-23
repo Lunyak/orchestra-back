@@ -21,7 +21,12 @@ import type { UseSpectacleRunArgs } from "./spectacle-run-types";
 
 export type { UseSpectacleRunArgs } from "./spectacle-run-types";
 
-export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpectacleRunArgs) {
+export function useSpectacleRun({
+  projectName,
+  scenes,
+  lightChannels,
+  kadrPlayback = true,
+}: UseSpectacleRunArgs) {
   const dispatch = useAppDispatch();
   const { playbookData, setPlaybookData, updateScene, setCurrentPage, currentPage, saveScenesForLightPlot } =
     usePlaybook();
@@ -126,6 +131,7 @@ export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpect
     currentPage,
     setCurrentPage,
     lightPlotMode,
+    kadrPlayback,
     isProgRun,
     kadrModalOpen,
     liveConsole,

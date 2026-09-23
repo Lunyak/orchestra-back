@@ -5,9 +5,16 @@ export function readSceneTheaterModels(
   scene: Pick<ScriptScene, "theaterModels" | "theaterDecor"> | undefined,
 ): TheaterModel[] {
   const props = scene?.theaterModels ?? [];
-  const decor = scene?.theaterDecor;
-  if (!decor?.length) return props;
-  return [...props, ...decor];
+  const decor = scene?.theaterDecor ?? [];
+  const combined = decor.length > 0 ? [...props, ...decor] : props;
+  const seenIds = new Set<number>();
+  const unique: TheaterModel[] = [];
+  for (const model of combined) {
+    if (seenIds.has(model.id)) continue;
+    seenIds.add(model.id);
+    unique.push(model);
+  }
+  return unique;
 }
 
 export function splitSceneTheaterModels(models: TheaterModel[]): {

@@ -10,6 +10,7 @@ import {
 import { getTheaterAssetLibraryItem } from "../../model/theater-asset-library";
 import { LIGHT_TRUSS_6M_BASE } from "../../model/theater-model-world-size";
 import { BuiltinModel } from "./BuiltinModel";
+import { dropStaleTheaterModelClones } from "./drop-stale-theater-model-clones";
 
 const FURNITURE_SELECTION_BUILTINS = new Set<
   NonNullable<TheaterModel["builtin"]>
@@ -156,6 +157,12 @@ export const BuiltinModelInstance = ({
     onObjectReady(groupRef.current, model.id);
     return () => onObjectReady(null, model.id);
   }, [model.id, onObjectReady]);
+
+  useEffect(() => {
+    const node = groupRef.current;
+    if (!node) return;
+    dropStaleTheaterModelClones(node, model.id);
+  }, [model.id, model.scale]);
 
   return (
     <group

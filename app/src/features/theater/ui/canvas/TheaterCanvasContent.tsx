@@ -601,6 +601,7 @@ export function TheaterCanvasContent({
         />
       ) : null}
       {isModelEditMode &&
+        modelTransformMode === "translate" &&
         !decorPlaceMode &&
         activeModel &&
         activeModelId != null ? (

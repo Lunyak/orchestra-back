@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
 import type { TheaterModel } from "../../../../shared/types/script";
+import { dropStaleTheaterModelClones } from "./drop-stale-theater-model-clones";
 
 export const FileModelInstance = ({
   model,
@@ -48,6 +49,12 @@ export const FileModelInstance = ({
     onObjectReady(groupRef.current, model.id);
     return () => onObjectReady(null, model.id);
   }, [model.id, onObjectReady]);
+
+  useEffect(() => {
+    const node = groupRef.current;
+    if (!node) return;
+    dropStaleTheaterModelClones(node, model.id);
+  }, [model.id, model.scale]);
 
   useEffect(() => {
     if (!names.length) return;
