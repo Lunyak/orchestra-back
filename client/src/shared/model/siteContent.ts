@@ -239,7 +239,7 @@ export function mergeSiteEventsWithFallback(
     return {
       ...fb,
       ...event,
-      subtitle: pickText(event.subtitle, fb.subtitle),
+      subtitle: event.subtitle?.trim() ? event.subtitle : undefined,
       old: pickText(event.old, fb.old),
       anonse: pickText(event.anonse, fb.anonse),
       date: pickText(event.date, fb.date),

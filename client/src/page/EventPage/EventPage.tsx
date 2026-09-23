@@ -25,7 +25,7 @@ const FALLBACK_EVENTS: SiteEvent[] = [
     slug: "железнова",
     soon: false,
     name: "Железнова",
-    subtitle: "верёвка на дворе",
+    subtitle: "",
     old: "16+",
     type: "драма",
     anonse: VASSA_ZHELEZNOVA_ANONSE,
