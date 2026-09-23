@@ -9,6 +9,7 @@ import {
   mergeProjectorPlaybookDataOnHydrate,
   normalizeHydratedScenes,
   normalizeScriptRequisites,
+  snapshotServerShadow,
 } from "./playbook-slice-helpers";
 import {
   DEFAULT_THEATER_LAYOUT,
@@ -84,7 +85,7 @@ export const playbookSlice = createSlice({
       state.scenesRevision += 1;
       state.playbookDataRevision += 1;
       if (Object.prototype.hasOwnProperty.call(action.payload, "serverShadow")) {
-        state.serverShadow = action.payload.serverShadow ?? null;
+        state.serverShadow = snapshotServerShadow(action.payload.serverShadow ?? null);
         state.serverShadowRevision += 1;
       }
     },
@@ -100,7 +101,7 @@ export const playbookSlice = createSlice({
         lightChannels: string[];
       } | null>,
     ) {
-      state.serverShadow = action.payload;
+      state.serverShadow = snapshotServerShadow(action.payload);
       state.serverShadowRevision += 1;
     },
     setPlaybookData(state, action: PayloadAction<PlaybookData | null>) {

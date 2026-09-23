@@ -21,7 +21,7 @@ export const THEATER_ASSET_LIBRARY: TheaterAssetLibraryItem[] = [
   {
     builtin: "libraryVelvetArmchair",
     assetKey: "velvet-armchair",
-    label: "Кожаное кресло Честерфилд",
+    label: "Бархатное кресло",
     category: "furniture",
     size: [1.06, 1.5, 1.08],
   },
@@ -52,6 +52,34 @@ export const THEATER_ASSET_LIBRARY: TheaterAssetLibraryItem[] = [
     label: "Барный табурет",
     category: "furniture",
     size: [0.65, 0.8, 0.65],
+  },
+  {
+    builtin: "libraryPaintedWoodenStool",
+    assetKey: "painted-wooden-stool",
+    label: "Крашеный табурет",
+    category: "furniture",
+    size: [0.38, 0.58, 0.41],
+  },
+  {
+    builtin: "libraryPaintedWoodenChair",
+    assetKey: "painted-wooden-chair",
+    label: "Крашеный стул",
+    category: "furniture",
+    size: [0.43, 0.96, 0.54],
+  },
+  {
+    builtin: "libraryPaintedWoodenChair02",
+    assetKey: "painted-wooden-chair-02",
+    label: "Крашеный стул 2",
+    category: "furniture",
+    size: [0.64, 1.26, 0.66],
+  },
+  {
+    builtin: "libraryPaintedWoodenNightstand",
+    assetKey: "painted-wooden-nightstand",
+    label: "Крашеная тумбочка",
+    category: "furniture",
+    size: [0.5, 0.62, 0.51],
   },
   {
     builtin: "libraryWoodenBench",
@@ -129,6 +157,13 @@ export const THEATER_ASSET_LIBRARY: TheaterAssetLibraryItem[] = [
     label: "Деревянный ящик",
     category: "props",
     size: [1, 0.9, 0.75],
+  },
+  {
+    builtin: "libraryPortCrate",
+    assetKey: "port-crate",
+    label: "Портовый ящик",
+    category: "props",
+    size: [0.83, 0.35, 0.41],
   },
   {
     builtin: "libraryFloorLamp",

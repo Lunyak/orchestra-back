@@ -133,6 +133,12 @@ export function ensureProjectIdCached(projectSlug: string, projectId: string) {
   }
 }
 
+/** Independent copy so later scene edits do not mutate the server baseline. */
+export function snapshotServerShadow<T>(value: T): T {
+  if (value == null) return value;
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 export function normalizeHydratedScenes(raw: ScriptScene[]): ScriptScene[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((scene) => {

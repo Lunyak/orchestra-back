@@ -122,9 +122,9 @@ export function TheaterModelsPage() {
 
   const busy = busyKey != null;
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (options?: { keepError?: boolean }) => {
     setLoading(true);
-    setError("");
+    if (!options?.keepError) setError("");
     try {
       const data = await getTheaterAssets();
       setSlots(data.slots);
@@ -180,7 +180,7 @@ export function TheaterModelsPage() {
         if (failParts.length > 0) setError(failParts.join("; "));
         if (uploadedCount > 0) setOk(`Залито файлов: ${uploadedCount}`);
       }
-      await load();
+      await load({ keepError: true });
     } catch (err) {
       setError(errorText(err));
     } finally {

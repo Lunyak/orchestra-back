@@ -539,6 +539,19 @@ export function usePlaybookSyncEffects() {
   }, [hasLocalEdits, scenesRevision, playbookDataRevision, theaterLayout, lightChannelsKey]);
 
   useEffect(() => {
+    const flushPendingSave = () => {
+      if (lightPlotSaveTimerRef.current != null) {
+        window.clearTimeout(lightPlotSaveTimerRef.current);
+        lightPlotSaveTimerRef.current = null;
+      }
+      if (!store.getState().playbook.hasLocalEdits) return;
+      void saveScenesForLightPlot({ force: true });
+    };
+    window.addEventListener("pagehide", flushPendingSave);
+    return () => window.removeEventListener("pagehide", flushPendingSave);
+  }, [saveScenesForLightPlot]);
+
+  useEffect(() => {
     if (!isPlaybookReady) return;
     if (scenes.length === 0 && !hasLocalEdits) return;
 
