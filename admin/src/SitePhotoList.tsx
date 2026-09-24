@@ -1,17 +1,49 @@
-import { useState, type DragEvent } from "react";
+import { useEffect, useState, type DragEvent } from "react";
 import "./site-photo-list.css";
 
 function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
 }
 
-function siteMediaUrl(pathOrUrl: string): string {
+export function siteMediaUrl(pathOrUrl: string): string {
   const value = pathOrUrl.trim();
   if (!value) return "";
   if (value.startsWith("http://") || value.startsWith("https://")) return value;
   const withoutSlash = value.replace(/^\/+/, "");
   const encoded = withoutSlash.split("/").map(encodeURIComponent).join("/");
   return `/minio/orchestra-media/site/${encoded}`;
+}
+
+export function SiteImagePreview({
+  path,
+  alt,
+  compact,
+}: {
+  path?: string;
+  alt: string;
+  compact?: boolean;
+}) {
+  const [broken, setBroken] = useState(false);
+  const value = path?.trim() ?? "";
+  const src = value ? siteMediaUrl(value) : "";
+
+  useEffect(() => {
+    setBroken(false);
+  }, [src]);
+
+  if (!src) {
+    return <p className="site-image-preview site-image-preview--empty">Картинка не задана</p>;
+  }
+
+  return (
+    <div className={cn("site-image-preview", compact && "site-image-preview--compact")}>
+      {broken ? (
+        <span className="site-image-preview__missing">Не удалось открыть</span>
+      ) : (
+        <img src={src} alt={alt} onError={() => setBroken(true)} />
+      )}
+    </div>
+  );
 }
 
 function photoLabel(path: string): string {

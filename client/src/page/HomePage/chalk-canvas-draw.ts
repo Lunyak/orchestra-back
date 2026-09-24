@@ -484,7 +484,7 @@ export function drawNeonLogoTriangle(
 
   ctx.save();
   ctx.translate(cx, pivotY);
-  ctx.rotate(rotation - Math.PI / 14);
+  ctx.rotate(rotation - Math.PI / 8);
   ctx.translate(-cx, -pivotY);
   ctx.lineJoin = "miter";
   ctx.lineCap = "butt";

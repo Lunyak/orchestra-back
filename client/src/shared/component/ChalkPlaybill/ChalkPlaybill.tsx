@@ -32,6 +32,7 @@ export const ChalkPlaybill: FC<ChalkPlaybillProps> = ({ items, loading, classNam
   const isEmpty = items.length === 0;
   const isDesktop = useAfishaDesktop();
   const [hovered, setHovered] = useState<SiteEvent | null>(null);
+  const board = useAfishaSideBoard(isDesktop ? hovered : null);
 
   return (
     <section className={cn("chalk-playbill", className)} aria-label="Афиша спектаклей">
@@ -57,7 +58,7 @@ export const ChalkPlaybill: FC<ChalkPlaybillProps> = ({ items, loading, classNam
           <p className="chalk-playbill__hint">билеты — на странице спектакля</p>
         </>
       )}
-      {isDesktop && hovered && <AfishaHoverBoard event={hovered} />}
+      {board.event && <AfishaHoverBoard event={board.event} shown={board.shown} />}
     </section>
   );
 };
@@ -125,13 +126,40 @@ function PlaybillRow({
   );
 }
 
+const SIDE_BOARD_MS = 420;
+
+function useAfishaSideBoard(hovered: SiteEvent | null) {
+  const [event, setEvent] = useState<SiteEvent | null>(null);
+  const [shown, setShown] = useState(false);
+  const poster = hovered?.sideImage?.trim() ?? "";
+
+  useEffect(() => {
+    if (hovered && poster) {
+      setEvent(hovered);
+      let inner = 0;
+      const outer = requestAnimationFrame(() => {
+        inner = requestAnimationFrame(() => setShown(true));
+      });
+      return () => {
+        cancelAnimationFrame(outer);
+        cancelAnimationFrame(inner);
+      };
+    }
+    setShown(false);
+    const timer = window.setTimeout(() => setEvent(null), SIDE_BOARD_MS);
+    return () => window.clearTimeout(timer);
+  }, [hovered, poster]);
+
+  return { event, shown };
+}
+
 function leaveRow(mouseEvent: MouseEvent, onHover: (event: SiteEvent | null) => void) {
   const next = mouseEvent.relatedTarget;
   if (next instanceof Element && next.closest(".chalk-afisha-board")) return;
   onHover(null);
 }
 
-function AfishaHoverBoard({ event }: { event: SiteEvent }) {
+function AfishaHoverBoard({ event, shown }: { event: SiteEvent; shown: boolean }) {
   const title = event.name?.trim() || "Спектакль";
   const poster = event.sideImage ? siteAsset(event.sideImage) : "";
   const tint = colorToCss(event.colorBackground);
@@ -146,10 +174,11 @@ function AfishaHoverBoard({ event }: { event: SiteEvent }) {
     };
   }, [tint]);
 
-  if (!poster) return null;
+  const host = document.querySelector(".chalk-flip");
+  if (!poster || !(host instanceof HTMLElement)) return null;
 
   return createPortal(
-    <div className="chalk-afisha-board">
+    <div className={cn("chalk-afisha-board", shown && "is-shown")}>
       <div className="chalk-afisha-board__poster chalk-afisha-board__poster--left">
         {poster && <img className="chalk-afisha-board__img" src={poster} alt="" />}
       </div>
@@ -157,7 +186,7 @@ function AfishaHoverBoard({ event }: { event: SiteEvent }) {
         {poster && <img className="chalk-afisha-board__img" src={poster} alt={title} />}
       </div>
     </div>,
-    document.body
+    host
   );
 }
 

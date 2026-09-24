@@ -24,6 +24,7 @@ body:has(.chalk-flip) {
 
 .chalk-flip__rotor {
   position: relative;
+  z-index: 2;
   width: var(--board-w);
   height: var(--board-h);
   transform-style: preserve-3d;

@@ -82,7 +82,46 @@ body {
 
 .admin-nav a:hover,
 .admin-nav a.active {
-  color: #60a5fa;
+  color: var(--color-active-ascent);
+}
+
+:where(.admin-page) :where(input:not([type="checkbox"]):not([type="file"]):not([type="color"]):not([type="radio"]), textarea, select) {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #475569;
+  background: #0f172a;
+  color: #e2e8f0;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+:where(.admin-page) textarea {
+  min-height: 140px;
+  resize: vertical;
+}
+
+:where(.admin-page) :where(input, textarea)::placeholder {
+  color: #64748b;
+}
+
+:where(.admin-page) :where(input, textarea, select):focus {
+  outline: 1px solid var(--color-active-ascent);
+  border-color: var(--color-active-ascent);
+}
+
+:where(.admin-page) input[type="color"] {
+  width: 72px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid #475569;
+  background: #0f172a;
+}
+
+.admin-page label {
+  color: #e2e8f0;
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 .admin-nav .logout {

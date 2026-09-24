@@ -25,6 +25,8 @@ export type SiteEvent = {
   listImage?: string;
   /** Wide image split across the afisha side panels. */
   sideImage?: string;
+  /** Half posters on the event page. Omitted or true shows them. */
+  showSideOnEvent?: boolean;
   /** Optional background image for Event page */
   eventPageBg?: string;
   /** Disable frosted glass overlay on Event page */
@@ -122,6 +124,7 @@ function normalizeEvent(raw: any): SiteEvent | null {
         ? raw.bgImage
         : undefined;
   const sideImage = typeof raw.sideImage === "string" ? raw.sideImage.trim() : undefined;
+  const showSideOnEvent = raw.showSideOnEvent === false ? false : undefined;
   const listImage = typeof raw.listImage === "string" ? raw.listImage.trim() : undefined;
   const disableGlass = raw.disableGlass === true ? true : undefined;
 
@@ -172,6 +175,7 @@ function normalizeEvent(raw: any): SiteEvent | null {
     cardImage,
     ...(listImage ? { listImage } : null),
     ...(sideImage ? { sideImage } : null),
+    ...(showSideOnEvent === false ? { showSideOnEvent: false } : null),
     ...(disableGlass ? { disableGlass: true } : null),
     type,
     colorBackground,
@@ -254,6 +258,7 @@ export function mergeSiteEventsWithFallback(
       type: pickText(event.type, fb.type),
       eventPageBg: pickText(event.eventPageBg, fb.eventPageBg),
       sideImage: pickText(event.sideImage, fb.sideImage),
+      showSideOnEvent: event.showSideOnEvent === false ? false : fb.showSideOnEvent,
       listImage: pickText(event.listImage, fb.listImage),
       rainAudioUrl: pickText(event.rainAudioUrl, fb.rainAudioUrl),
       rainButtonLabel: pickText(event.rainButtonLabel, fb.rainButtonLabel),

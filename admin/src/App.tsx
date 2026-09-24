@@ -1,6 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { NavLink, Route, Routes, useNavigate } from "react-router-dom";
-import { SitePhotoList } from "./SitePhotoList";
+import { SiteEventsList, SiteFileButton } from "./SiteEventsList";
+import { SiteImagePreview, SitePhotoList, siteMediaUrl } from "./SitePhotoList";
+import "./site-events.css";
 import {
   adminLogin,
   adminLogout,
@@ -480,6 +482,7 @@ type SiteEvent = {
   date?: string;
   cardImage: string;
   sideImage?: string;
+  showSideOnEvent?: boolean;
   listImage?: string;
   eventPageBg?: string;
   disableGlass?: boolean;
@@ -667,14 +670,6 @@ function SiteEventsCrudPage() {
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
   const [loadedMeta, setLoadedMeta] = useState<{ version: number | null; updatedAt: string | null } | null>(null);
-  const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [sideFile, setSideFile] = useState<File | null>(null);
-  const [listFile, setListFile] = useState<File | null>(null);
-  const [bgFile, setBgFile] = useState<File | null>(null);
-  const [photosFiles, setPhotosFiles] = useState<File[]>([]);
-  const [reviewImagesFiles, setReviewImagesFiles] = useState<File[]>([]);
-  const [rainAudioFile, setRainAudioFile] = useState<File | null>(null);
-  const photosInputRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
     setError("");
@@ -776,6 +771,19 @@ function SiteEventsCrudPage() {
     setOk(`Загружено: ${out.url}`);
   };
 
+  const runUpload = async (task: () => Promise<void>) => {
+    setLoading(true);
+    setError("");
+    setOk("");
+    try {
+      await task();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка загрузки");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const uploadAndSetRainAudio = async (file: File) => {
     if (!selected) throw new Error("Не выбран спектакль");
     const slugSeg = normalizePathSegment(selected.slug);
@@ -855,11 +863,32 @@ function SiteEventsCrudPage() {
     setSelectedSlug(slug);
   };
 
-  const removeSelected = () => {
-    if (!selectedSlug) return;
-    if (!confirm(`Удалить спектакль "${selectedSlug}"?`)) return;
-    setContent((prev) => ({ ...prev, events: (prev.events ?? []).filter((e) => e.slug !== selectedSlug) }));
-    setSelectedSlug(null);
+  const removeEvent = (slug: string) => {
+    if (!slug) return;
+    const event = (content.events ?? []).find((item) => item.slug === slug);
+    const label = event?.name?.trim() || slug;
+    if (!confirm(`Удалить спектакль «${label}»? Со страницы афиши он пропадёт после «Опубликовать».`)) return;
+    setContent((prev) => ({ ...prev, events: (prev.events ?? []).filter((item) => item.slug !== slug) }));
+    setSelectedSlug((current) => (current === slug ? null : current));
+  };
+
+  const reorderEvents = (fromIndex: number, toIndex: number) => {
+    setContent((prev) => {
+      const events = prev.events ?? [];
+      if (
+        fromIndex === toIndex ||
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= events.length ||
+        toIndex >= events.length
+      ) {
+        return prev;
+      }
+      const next = events.slice();
+      const [item] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, item);
+      return { ...prev, events: next };
+    });
   };
 
   const publish = async () => {
@@ -927,68 +956,59 @@ function SiteEventsCrudPage() {
   const reviewImagesText = (selected?.reviewImages ?? []).join("\n");
 
   return (
-    <div className="admin-page">
+    <div className="admin-page site-events">
       <h1>Спектакли</h1>
+      <p className="site-events__lead">
+        Порядок в списке слева — это порядок на странице афиши. После правок нажми «Опубликовать».
+      </p>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+      <div className="site-events__toolbar">
         <button type="button" onClick={load} disabled={loading}>
           {loading ? "…" : "Загрузить"}
         </button>
-        <button type="button" onClick={publish} disabled={loading}>
+        <button type="button" className="site-events__publish" onClick={publish} disabled={loading}>
           {loading ? "…" : "Опубликовать"}
         </button>
         <button type="button" onClick={createNew} disabled={loading}>
           + Создать
         </button>
-        <button type="button" onClick={removeSelected} disabled={loading || !selectedSlug} className="small danger">
-          Удалить
+        <button
+          type="button"
+          onClick={() => selectedSlug && removeEvent(selectedSlug)}
+          disabled={loading || !selectedSlug}
+          className="small danger"
+        >
+          Удалить выбранный
         </button>
-        <a href={url} target="_blank" rel="noopener noreferrer">
+        <a className="site-events__json-link" href={url} target="_blank" rel="noopener noreferrer">
           Открыть JSON
         </a>
       </div>
 
       {loadedMeta && (
-        <div style={{ marginBottom: 10, opacity: 0.85 }}>
+        <p className="site-events__meta">
           version={loadedMeta.version ?? "—"}, updatedAt={loadedMeta.updatedAt ?? "—"}
-        </div>
+        </p>
       )}
-      {error && <div style={{ marginBottom: 10, color: "#b00020" }}>Ошибка: {error}</div>}
-      {ok && <div style={{ marginBottom: 10, color: "#0a7a2f" }}>{ok}</div>}
+      {error && <p className="site-events__error">Ошибка: {error}</p>}
+      {ok && <p className="site-events__ok">{ok}</p>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 14 }}>
-        <div style={{ border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, padding: 10 }}>
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>Список</div>
-          <div style={{ display: "grid", gap: 6 }}>
-            {(content.events ?? []).map((e) => (
-              <button
-                key={e.slug}
-                type="button"
-                onClick={() => setSelectedSlug(e.slug)}
-                style={{
-                  textAlign: "left",
-                  padding: "8px 10px",
-                  borderRadius: 8,
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  background: e.slug === selectedSlug ? "rgba(255,255,255,0.08)" : "transparent",
-                  color: "inherit",
-                  cursor: "pointer",
-                }}
-              >
-                <div style={{ fontWeight: 700 }}>{e.name}</div>
-                <div style={{ opacity: 0.8, fontSize: 12 }}>{e.slug}</div>
-              </button>
-            ))}
-          </div>
-        </div>
+      <div className="site-events__layout">
+        <SiteEventsList
+          events={content.events ?? []}
+          selectedSlug={selectedSlug}
+          onSelect={setSelectedSlug}
+          onReorder={reorderEvents}
+          onRemove={removeEvent}
+        />
 
-        <div style={{ border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, padding: 12 }}>
+        <div className="site-events__panel">
           {!selected ? (
-            <div style={{ opacity: 0.8 }}>Выбери спектакль слева или нажми “Создать”.</div>
+            <p className="site-events__empty">Выбери спектакль слева или нажми «Создать».</p>
           ) : (
-            <div style={{ display: "grid", gap: 10 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <label style={{ display: "grid", gap: 6 }}>
+            <div className="site-events__form">
+              <div className="site-events__grid site-events__grid--2">
+                <label className="site-events__field">
                   <span>Slug (URL: /события/&lt;slug&gt;)</span>
                   <input
                     value={selected.slug}
@@ -1006,31 +1026,31 @@ function SiteEventsCrudPage() {
                     spellCheck={false}
                   />
                 </label>
-                <label style={{ display: "grid", gap: 6 }}>
+                <label className="site-events__field">
                   <span>Название</span>
                   <input value={selected.name} onChange={(e) => updateSelected({ name: e.target.value })} />
                 </label>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-                <label style={{ display: "grid", gap: 6 }}>
+              <div className="site-events__grid site-events__grid--3">
+                <label className="site-events__field">
                   <span>Скоро</span>
                   <select value={selected.soon ? "yes" : "no"} onChange={(e) => updateSelected({ soon: e.target.value === "yes" })}>
                     <option value="no">нет</option>
                     <option value="yes">да</option>
                   </select>
                 </label>
-                <label style={{ display: "grid", gap: 6 }}>
+                <label className="site-events__field">
                   <span>Дата</span>
                   <input value={selected.date ?? ""} onChange={(e) => updateSelected({ date: e.target.value })} />
                 </label>
-                <label style={{ display: "grid", gap: 6 }}>
+                <label className="site-events__field">
                   <span>Возраст</span>
                   <input value={selected.old ?? ""} onChange={(e) => updateSelected({ old: e.target.value })} />
                 </label>
               </div>
 
-              <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <label className="site-events__check">
                 <input
                   type="checkbox"
                   checked={!!selected.disableGlass}
@@ -1039,8 +1059,8 @@ function SiteEventsCrudPage() {
                 <span>Отключить матовое стекло на странице спектакля (disableGlass)</span>
               </label>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <label style={{ display: "grid", gap: 6 }}>
+              <div className="site-events__grid site-events__grid--2">
+                <label className="site-events__field">
                   <span>TicketCloud eventId</span>
                   <input
                     value={selected.ticketsCloudEventId ?? ""}
@@ -1049,7 +1069,7 @@ function SiteEventsCrudPage() {
                     spellCheck={false}
                   />
                 </label>
-                <label style={{ display: "grid", gap: 6 }}>
+                <label className="site-events__field">
                   <span>TicketCloud token</span>
                   <input
                     value={selected.ticketsCloudToken ?? ""}
@@ -1060,8 +1080,8 @@ function SiteEventsCrudPage() {
                 </label>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                <label style={{ display: "grid", gap: 6 }}>
+              <div className="site-events__grid site-events__grid--2">
+                <label className="site-events__field">
                   <span>Дождь: аудио (rainAudioUrl)</span>
                   <input
                     value={selected.rainAudioUrl ?? ""}
@@ -1070,7 +1090,7 @@ function SiteEventsCrudPage() {
                     spellCheck={false}
                   />
                 </label>
-                <label style={{ display: "grid", gap: 6 }}>
+                <label className="site-events__field">
                   <span>Дождь: название кнопки (rainButtonLabel)</span>
                   <input
                     value={selected.rainButtonLabel ?? ""}
@@ -1081,41 +1101,26 @@ function SiteEventsCrudPage() {
                 </label>
               </div>
 
-              <div style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 13, opacity: 0.9 }}>
+              <div className="site-events__field">
+                <span className="site-events__hint">
                   Загрузить аудио дождя в MinIO и вставить в rainAudioUrl
                 </span>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                  <input
-                    type="file"
-                    accept="audio/*"
-                    onChange={(e) => setRainAudioFile(e.target.files?.[0] ?? null)}
-                  />
-                  <button
-                    type="button"
-                    className="small"
-                    disabled={loading || !rainAudioFile}
-                    onClick={async () => {
-                      if (!rainAudioFile) return;
-                      setLoading(true);
-                      setError("");
-                      setOk("");
-                      try {
-                        await uploadAndSetRainAudio(rainAudioFile);
-                        setRainAudioFile(null);
-                      } catch (e) {
-                        setError(e instanceof Error ? e.message : "Ошибка загрузки");
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
-                  >
-                    Загрузить аудио
-                  </button>
-                </div>
+                <SiteFileButton
+                  label="Загрузить аудио"
+                  accept="audio/*"
+                  disabled={loading}
+                  onPick={(files) => {
+                    const file = files[0];
+                    if (!file) return;
+                    void runUpload(() => uploadAndSetRainAudio(file));
+                  }}
+                />
+                {selected.rainAudioUrl?.trim() ? (
+                  <audio className="site-events__audio" controls src={siteMediaUrl(selected.rainAudioUrl)} />
+                ) : null}
               </div>
 
-              <label style={{ display: "grid", gap: 6 }}>
+              <label className="site-events__field">
                 <span>Лицевое изображение (cardImage)</span>
                 <input
                   value={selected.cardImage}
@@ -1123,40 +1128,24 @@ function SiteEventsCrudPage() {
                   placeholder="afisha.jpg или /photos/..."
                   spellCheck={false}
                 />
+                <SiteImagePreview path={selected.cardImage} alt={selected.name || "Обложка"} />
               </label>
 
-              <div style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 13, opacity: 0.9 }}>Загрузить обложку в MinIO и вставить в cardImage</span>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)}
-                  />
-                  <button
-                    type="button"
-                    className="small"
-                    disabled={loading || !coverFile}
-                    onClick={async () => {
-                      if (!coverFile) return;
-                      setLoading(true);
-                      setError("");
-                      setOk("");
-                      try {
-                        await uploadAndSetField(coverFile, "cover");
-                      } catch (e) {
-                        setError(e instanceof Error ? e.message : "Ошибка загрузки");
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
-                  >
-                    Загрузить обложку
-                  </button>
-                </div>
+              <div className="site-events__field">
+                <span className="site-events__hint">Загрузить обложку в MinIO и вставить в cardImage</span>
+                <SiteFileButton
+                  label="Загрузить обложку"
+                  accept="image/*"
+                  disabled={loading}
+                  onPick={(files) => {
+                    const file = files[0];
+                    if (!file) return;
+                    void runUpload(() => uploadAndSetField(file, "cover"));
+                  }}
+                />
               </div>
 
-              <label style={{ display: "grid", gap: 6 }}>
+              <label className="site-events__field">
                 <span>Картинка по бокам афиши (sideImage)</span>
                 <input
                   value={selected.sideImage ?? ""}
@@ -1164,41 +1153,37 @@ function SiteEventsCrudPage() {
                   placeholder="/sides/..."
                   spellCheck={false}
                 />
-              </label>
-
-              <div style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 13, opacity: 0.9 }}>Загрузить картинку для боковых половинок</span>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setSideFile(e.target.files?.[0] ?? null)}
-                  />
+                <div className="site-events__side-row">
+                  <SiteImagePreview path={selected.sideImage} alt="Картинка по бокам афиши" />
                   <button
                     type="button"
-                    className="small"
-                    disabled={loading || !sideFile}
-                    onClick={async () => {
-                      if (!sideFile) return;
-                      setLoading(true);
-                      setError("");
-                      setOk("");
-                      try {
-                        await uploadAndSetField(sideFile, "side");
-                        setSideFile(null);
-                      } catch (e) {
-                        setError(e instanceof Error ? e.message : "Ошибка загрузки");
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
+                    className="site-events__side-toggle"
+                    aria-pressed={selected.showSideOnEvent !== false}
+                    disabled={loading}
+                    onClick={() => updateSelected({ showSideOnEvent: selected.showSideOnEvent === false })}
                   >
-                    Загрузить боковую картинку
+                    {selected.showSideOnEvent === false
+                      ? "На странице спектакля скрыты"
+                      : "На странице спектакля показаны"}
                   </button>
                 </div>
+              </label>
+
+              <div className="site-events__field">
+                <span className="site-events__hint">Загрузить картинку для боковых половинок</span>
+                <SiteFileButton
+                  label="Загрузить боковую картинку"
+                  accept="image/*"
+                  disabled={loading}
+                  onPick={(files) => {
+                    const file = files[0];
+                    if (!file) return;
+                    void runUpload(() => uploadAndSetField(file, "side"));
+                  }}
+                />
               </div>
 
-              <label style={{ display: "grid", gap: 6 }}>
+              <label className="site-events__field">
                 <span>Афиша в мобильном списке (listImage)</span>
                 <input
                   value={selected.listImage ?? ""}
@@ -1206,41 +1191,24 @@ function SiteEventsCrudPage() {
                   placeholder="/lists/..."
                   spellCheck={false}
                 />
+                <SiteImagePreview path={selected.listImage} alt="Афиша в мобильном списке" />
               </label>
 
-              <div style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 13, opacity: 0.9 }}>Загрузить отдельную картинку для мобильной афиши</span>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setListFile(e.target.files?.[0] ?? null)}
-                  />
-                  <button
-                    type="button"
-                    className="small"
-                    disabled={loading || !listFile}
-                    onClick={async () => {
-                      if (!listFile) return;
-                      setLoading(true);
-                      setError("");
-                      setOk("");
-                      try {
-                        await uploadAndSetField(listFile, "list");
-                        setListFile(null);
-                      } catch (e) {
-                        setError(e instanceof Error ? e.message : "Ошибка загрузки");
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
-                  >
-                    Загрузить афишу списка
-                  </button>
-                </div>
+              <div className="site-events__field">
+                <span className="site-events__hint">Загрузить отдельную картинку для мобильной афиши</span>
+                <SiteFileButton
+                  label="Загрузить афишу списка"
+                  accept="image/*"
+                  disabled={loading}
+                  onPick={(files) => {
+                    const file = files[0];
+                    if (!file) return;
+                    void runUpload(() => uploadAndSetField(file, "list"));
+                  }}
+                />
               </div>
 
-              <label style={{ display: "grid", gap: 6 }}>
+              <label className="site-events__field">
                 <span>Цвет фона по бокам</span>
                 <input
                   type="color"
@@ -1249,7 +1217,7 @@ function SiteEventsCrudPage() {
                 />
               </label>
 
-              <label style={{ display: "grid", gap: 6 }}>
+              <label className="site-events__field">
                 <span>Фон страницы спектакля (eventPageBg)</span>
                 <input
                   value={selected.eventPageBg ?? ""}
@@ -1257,77 +1225,39 @@ function SiteEventsCrudPage() {
                   placeholder="/photos/..."
                   spellCheck={false}
                 />
+                <SiteImagePreview path={selected.eventPageBg} alt="Фон страницы спектакля" />
               </label>
 
-              <div style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 13, opacity: 0.9 }}>Загрузить фон в MinIO и вставить в eventPageBg</span>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setBgFile(e.target.files?.[0] ?? null)}
-                  />
-                  <button
-                    type="button"
-                    className="small"
-                    disabled={loading || !bgFile}
-                    onClick={async () => {
-                      if (!bgFile) return;
-                      setLoading(true);
-                      setError("");
-                      setOk("");
-                      try {
-                        await uploadAndSetField(bgFile, "bg");
-                      } catch (e) {
-                        setError(e instanceof Error ? e.message : "Ошибка загрузки");
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
-                  >
-                    Загрузить фон
-                  </button>
-                </div>
+              <div className="site-events__field">
+                <span className="site-events__hint">Загрузить фон в MinIO и вставить в eventPageBg</span>
+                <SiteFileButton
+                  label="Загрузить фон"
+                  accept="image/*"
+                  disabled={loading}
+                  onPick={(files) => {
+                    const file = files[0];
+                    if (!file) return;
+                    void runUpload(() => uploadAndSetField(file, "bg"));
+                  }}
+                />
               </div>
 
-              <label style={{ display: "grid", gap: 6 }}>
+              <label className="site-events__field">
                 <span>Описание (anonse)</span>
-                <textarea value={selected.anonse ?? ""} onChange={(e) => updateSelected({ anonse: e.target.value })} />
+                <textarea className="site-events__textarea" value={selected.anonse ?? ""} onChange={(e) => updateSelected({ anonse: e.target.value })} />
               </label>
 
-              <div style={{ display: "grid", gap: 6 }}>
+              <div className="site-events__field">
                 <span>Фото</span>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                  <input
-                    ref={photosInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={(e) => setPhotosFiles(Array.from(e.target.files ?? []))}
-                  />
-                  <button
-                    type="button"
-                    className="small"
-                    disabled={loading || photosFiles.length === 0}
-                    onClick={async () => {
-                      if (photosFiles.length === 0) return;
-                      setLoading(true);
-                      setError("");
-                      setOk("");
-                      try {
-                        await uploadAndAppendPhotos(photosFiles);
-                        setPhotosFiles([]);
-                        if (photosInputRef.current) photosInputRef.current.value = "";
-                      } catch (e) {
-                        setError(e instanceof Error ? e.message : "Ошибка загрузки");
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
-                  >
-                    Загрузить фото
-                  </button>
-                </div>
+                <SiteFileButton
+                  label="Загрузить фото"
+                  accept="image/*"
+                  multiple
+                  disabled={loading}
+                  onPick={(files) => {
+                    void runUpload(() => uploadAndAppendPhotos(files));
+                  }}
+                />
                 <SitePhotoList
                   photos={selected.photos ?? []}
                   onRemove={(index) => {
@@ -1338,53 +1268,42 @@ function SiteEventsCrudPage() {
                 />
               </div>
 
-              <div style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 13, opacity: 0.9 }}>Загрузить фото-отзывы (добавятся в reviewImages)</span>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={(e) => setReviewImagesFiles(Array.from(e.target.files ?? []))}
-                  />
-                  <button
-                    type="button"
-                    className="small"
-                    disabled={loading || reviewImagesFiles.length === 0}
-                    onClick={async () => {
-                      if (reviewImagesFiles.length === 0) return;
-                      setLoading(true);
-                      setError("");
-                      setOk("");
-                      try {
-                        await uploadAndAppendReviewImages(reviewImagesFiles);
-                        setReviewImagesFiles([]);
-                      } catch (e) {
-                        setError(e instanceof Error ? e.message : "Ошибка загрузки");
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
-                  >
-                    Загрузить отзывы
-                  </button>
-                </div>
+              <div className="site-events__field">
+                <span className="site-events__hint">Загрузить фото-отзывы (добавятся в reviewImages)</span>
+                <SiteFileButton
+                  label="Загрузить отзывы"
+                  accept="image/*"
+                  multiple
+                  disabled={loading}
+                  onPick={(files) => {
+                    void runUpload(() => uploadAndAppendReviewImages(files));
+                  }}
+                />
               </div>
 
-              <label style={{ display: "grid", gap: 6 }}>
+              <label className="site-events__field">
                 <span>Отзывы-картинки (reviewImages, по одному пути на строку)</span>
                 <textarea
+                  className="site-events__textarea"
                   value={reviewImagesText}
                   onChange={(e) =>
                     updateSelected({ reviewImages: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean) })
                   }
                   spellCheck={false}
                 />
+                {(selected.reviewImages ?? []).length > 0 ? (
+                  <div className="site-image-preview-row">
+                    {(selected.reviewImages ?? []).map((path) => (
+                      <SiteImagePreview key={path} path={path} alt={path} compact />
+                    ))}
+                  </div>
+                ) : null}
               </label>
 
-              <label style={{ display: "grid", gap: 6 }}>
+              <label className="site-events__field">
                 <span>Cast (по строке: Роль — Актёр)</span>
                 <textarea
+                  className="site-events__textarea site-events__textarea--tall"
                   value={castText}
                   onChange={(e) => {
                     const lines = e.target.value.split("\n").map((s) => s.trim()).filter(Boolean);
@@ -1404,9 +1323,10 @@ function SiteEventsCrudPage() {
                 />
               </label>
 
-              <label style={{ display: "grid", gap: 6 }}>
+              <label className="site-events__field">
                 <span>Отзывы (по строке: Автор — Текст, либо просто Текст)</span>
                 <textarea
+                  className="site-events__textarea site-events__textarea--tall"
                   value={reviewsText}
                   onChange={(e) => {
                     const lines = e.target.value.split("\n").map((s) => s.trim()).filter(Boolean);

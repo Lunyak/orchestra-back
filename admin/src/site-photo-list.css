@@ -85,6 +85,51 @@
   background: #991b1b;
 }
 
+.site-image-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 180px;
+  max-width: 100%;
+  min-height: 120px;
+  margin: 0;
+  border: 1px solid #334155;
+  background: #0f172a;
+  overflow: hidden;
+}
+
+.site-image-preview--compact {
+  width: 120px;
+  min-height: 80px;
+}
+
+.site-image-preview--empty,
+.site-image-preview__missing {
+  margin: 0;
+  padding: 12px;
+  color: #94a3b8;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.site-image-preview img {
+  display: block;
+  width: 100%;
+  height: 160px;
+  object-fit: contain;
+  background: #0f172a;
+}
+
+.site-image-preview--compact img {
+  height: 90px;
+}
+
+.site-image-preview-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .site-photo-list__name {
   overflow: hidden;
   color: #94a3b8;

@@ -475,7 +475,7 @@ const EventPage: FC = () => {
           .
         </p>
       )}
-      {curentEvent.sideImage?.trim() && (
+      {curentEvent.showSideOnEvent !== false && curentEvent.sideImage?.trim() && (
         <EventSideSplit src={siteAsset(curentEvent.sideImage.trim())} title={title} />
       )}
     </ChalkPageShell>

@@ -518,6 +518,27 @@
   right: auto;
 }
 
+.chalk-afisha-board:not(.chalk-afisha-board--page) {
+  z-index: 1;
+}
+
+.chalk-afisha-board:not(.chalk-afisha-board--page) .chalk-afisha-board__poster {
+  transition: transform 460ms ease;
+}
+
+.chalk-afisha-board:not(.chalk-afisha-board--page) .chalk-afisha-board__poster--left {
+  transform: translateX(100%);
+}
+
+.chalk-afisha-board:not(.chalk-afisha-board--page) .chalk-afisha-board__poster--right {
+  transform: translateX(-100%);
+}
+
+.chalk-afisha-board.is-shown:not(.chalk-afisha-board--page) .chalk-afisha-board__poster--left,
+.chalk-afisha-board.is-shown:not(.chalk-afisha-board--page) .chalk-afisha-board__poster--right {
+  transform: translateX(0);
+}
+
 .chalk-afisha-board__img {
   display: block;
   width: 200%;
