@@ -23,6 +23,7 @@ import type { StageGridCell } from "../../playbook-stage/use-stage-grid-highligh
 import { TheaterStage } from "../three/TheaterStage";
 import { DecorFloorPlacer } from "../three/DecorFloorPlacer";
 import { BuiltinTemplateFloorDrop } from "../three/BuiltinTemplateFloorDrop";
+import { expandModelIdsWithGroups } from "../../model/theater-model-groups";
 import { ModelFloorMoveHandles } from "../three/ModelFloorMoveHandles";
 import { LightRigMoveHandle } from "../three/LightRigMoveHandle";
 import type { HallExpandResult } from "../../model/theater-hall-expand";
@@ -49,6 +50,7 @@ import type { SceneOutlinerKind } from "../../model/theater-scene-outliner";
 import type { TheaterViewPrefs } from "../../model/theater-view-prefs-storage";
 import type { TheaterSmokePosition } from "../../model/theater-smoke-settings";
 import {
+  resolveSpotlightLightBudget,
   THEATER_SMOKE_FOG_FAR,
   THEATER_SMOKE_FOG_NEAR,
 } from "../../model/theater-scene-lighting";
@@ -72,6 +74,7 @@ export type TheaterCanvasContentProps = {
   wallsHideFromCamera: boolean;
   dutyLightEnabled: boolean;
   smokeMachineEnabled: boolean;
+  smokePanelOpen: boolean;
   smokePosition: TheaterSmokePosition;
   smokeIntensity: number;
   smokeSaturation: number;
@@ -92,7 +95,7 @@ export type TheaterCanvasContentProps = {
     position: [number, number, number],
   ) => void;
   isDragging: boolean;
-  dragMode: "target" | "source";
+  dragMode: "target" | "source" | null;
   highlightGridCell: StageGridCell | null;
   spotlightAimMode: "point" | "cell";
   onPickGridCell: (col: number, row: number) => void;
@@ -104,7 +107,7 @@ export type TheaterCanvasContentProps = {
   onSpotlightTargetChange: (id: number, target: [number, number, number]) => void;
   onSpotlightPositionChange: (id: number, position: [number, number, number]) => void;
   onSpotlightSelect: (id: number, additive?: boolean) => void;
-  onSpotlightContextMenu: (id: number) => void;
+  onSpotlightContextMenu: (id: number, clientX: number, clientY: number) => void;
   onSpotlightDragStart: () => void;
   onSpotlightDragEnd: () => void;
   onDraggingChange: (dragging: boolean) => void;
@@ -115,13 +118,14 @@ export type TheaterCanvasContentProps = {
   hoveredModelId: number | null;
   isModelEditMode: boolean;
   onModelSelect: (id: number, additive?: boolean) => void;
-  onModelContextMenu: (id: number) => void;
+  onModelContextMenu: (id: number, clientX: number, clientY: number) => void;
   onModelHoverChange: (id: number | null) => void;
   onModelActivate: (id: number) => void;
   sceneRenderKey: string;
   activeModelObject: THREE.Object3D | null;
   activeModelObjectId: number | undefined;
   modelTransformMode: "translate" | "rotate" | "scale";
+  modelDragArmed: boolean;
   onModelTransformStart: () => void;
   onTrussMountPointClick: (
     modelId: number,
@@ -185,6 +189,17 @@ export type TheaterCanvasContentProps = {
   onAudienceContextMenu?: (hit: TheaterAudienceContextHit) => void;
 };
 
+function figureModelsForHandles(
+  models: TheaterModel[],
+  activeId: number,
+  selectedIds: number[],
+): TheaterModel[] {
+  const seeds = selectedIds.includes(activeId) ? selectedIds : [activeId];
+  const memberIds = new Set(expandModelIdsWithGroups(models, seeds));
+  if (memberIds.size < 2) return [];
+  return models.filter((model) => memberIds.has(model.id));
+}
+
 export function TheaterCanvasContent({
   projectName,
   layout,
@@ -203,6 +218,7 @@ export function TheaterCanvasContent({
   wallsHideFromCamera,
   dutyLightEnabled,
   smokeMachineEnabled,
+  smokePanelOpen,
   smokePosition,
   smokeIntensity,
   smokeSaturation,
@@ -248,6 +264,7 @@ export function TheaterCanvasContent({
   activeModelObject,
   activeModelObjectId,
   modelTransformMode,
+  modelDragArmed,
   onModelTransformStart,
   onTrussMountPointClick,
   onModelTransformEnd,
@@ -327,14 +344,22 @@ export function TheaterCanvasContent({
     modelTransformMode === "rotate";
   const hallOffsetX = resolveHallOffsetX(layout);
   const hallOffsetZ = resolveHallOffsetZ(layout);
-  const handleModelContextMenu = (id: number) => {
+  const handleModelContextMenu = (id: number, clientX: number, clientY: number) => {
     if (isTheaterRightClickNav()) return;
-    onModelContextMenu(id);
+    onModelContextMenu(id, clientX, clientY);
   };
-  const handleSpotlightContextMenu = (id: number) => {
+  const handleSpotlightContextMenu = (id: number, clientX: number, clientY: number) => {
     if (isTheaterRightClickNav()) return;
-    onSpotlightContextMenu(id);
+    onSpotlightContextMenu(id, clientX, clientY);
   };
+  const selectedSpotlightIds =
+    activeSpotlightId == null
+      ? multiSelectedSpotlightIds
+      : [...multiSelectedSpotlightIds, activeSpotlightId];
+  const spotlightBudget = resolveSpotlightLightBudget(
+    visibleSpotlights,
+    selectedSpotlightIds,
+  );
 
   return (
     <>
@@ -390,7 +415,7 @@ export function TheaterCanvasContent({
         intensity={smokeIntensity}
         saturation={smokeSaturation}
         size={smokeSize}
-        draggable={showEditorHelpers && smokeMachineEnabled}
+        draggable={showEditorHelpers && smokeMachineEnabled && smokePanelOpen}
         onPositionChange={onSmokePositionChange}
         onDraggingChange={onDraggingChange}
       />
@@ -505,8 +530,11 @@ export function TheaterCanvasContent({
           showHelpers={showEditorHelpers && showSpotlights}
           showSpotlightLabels={showEditorHelpers && showSpotlights}
           showGuideLine={showSpotlightGuideLines}
-          smokeBeamVisible={smokeMachineEnabled}
+          smokeBeamVisible={
+            smokeMachineEnabled && spotlightBudget.smokeBeamIds.has(item.id)
+          }
           smokeSaturation={smokeSaturation}
+          castShadow={spotlightBudget.shadowIds.has(item.id)}
           onTargetChange={onSpotlightTargetChange}
           onPositionChange={onSpotlightPositionChange}
           onDraggingChange={onDraggingChange}
@@ -601,12 +629,18 @@ export function TheaterCanvasContent({
         />
       ) : null}
       {isModelEditMode &&
+        modelDragArmed &&
         modelTransformMode === "translate" &&
         !decorPlaceMode &&
         activeModel &&
         activeModelId != null ? (
         <ModelFloorMoveHandles
           model={activeModel}
+          figureModels={figureModelsForHandles(
+            [...instancedFurnitureModels, ...individualModels],
+            activeModel.id,
+            multiSelectedModelIds,
+          )}
           object={
             activeModelObjectId === activeModelId ? activeModelObject : null
           }
@@ -641,6 +675,7 @@ export function TheaterCanvasContent({
         />
       ) : null}
       {isModelEditMode &&
+        modelDragArmed &&
         activeModelObject &&
         activeModelObjectId === activeModelId &&
         activeModelObject.parent && (

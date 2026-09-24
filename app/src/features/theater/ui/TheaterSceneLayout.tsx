@@ -68,6 +68,7 @@ import {
 } from "../model/theater-camera-focus";
 import type { HallExpandResult } from "../model/theater-hall-expand";
 import { translateLightTrusses } from "../model/theater-light-rig";
+import { expandModelIdsWithGroups } from "../model/theater-model-groups";
 import { isLightTrussModel } from "../model/theater-truss-mounts";
 import type { TheaterSmokePosition } from "../model/theater-smoke-settings";
 import type { TheaterSceneViewModel } from "../model/use-theater-scene";
@@ -122,14 +123,68 @@ export type TheaterSceneLayoutProps = {
   individualModels: TheaterModel[];
   isModelEditMode: boolean;
   onSelectModel: (id: number, additive?: boolean) => void;
-  onFocusModel: (id: number) => void;
+  onModelContextMenu: (id: number, clientX: number, clientY: number) => void;
   onSelectSpotlight: (id: number, additive?: boolean) => void;
-  onFocusSpotlight: (id: number) => void;
+  onFocusSpotlight: (id: number, clientX: number, clientY: number) => void;
+  spotlightContextMenu: {
+    x: number;
+    y: number;
+    title: string;
+    items: TheaterObjectContextMenuItem[];
+  } | null;
+  onSpotlightContextPick: (id: string) => void;
+  onSpotlightContextColorChange: (id: string, color: string) => void;
+  onSpotlightContextRangeChange: (id: string, value: number) => void;
+  onSpotlightContextRangeStart: () => void;
+  onSpotlightContextRangeCommit: () => void;
+  onCloseSpotlightContext: () => void;
+  modelContextMenu: {
+    x: number;
+    y: number;
+    title: string;
+    items: TheaterObjectContextMenuItem[];
+  } | null;
+  onModelContextPick: (id: string) => void;
+  onCloseModelContext: () => void;
   onLayoutSizePreview: (result: HallExpandResult) => void;
   onLayoutSizeCommit: (result: HallExpandResult) => void;
   onLayoutSizeDragStart: () => void;
   onLayoutSizeDragEnd: () => void;
 };
+
+function moveModelsAsFigure(
+  vm: TheaterSceneViewModel,
+  position: [number, number, number],
+  commit: boolean,
+) {
+  const active = vm.activeModel;
+  if (!active) return;
+  const seeds = vm.multiSelectedModelIds.includes(active.id)
+    ? vm.multiSelectedModelIds
+    : [active.id];
+  const memberIds = new Set(expandModelIdsWithGroups(vm.models, seeds));
+  const dx = position[0] - active.position[0];
+  const dz = position[2] - active.position[2];
+  const next = vm.models.map((model) => {
+    if (!memberIds.has(model.id)) return model;
+    if (model.id === active.id) return { ...model, position };
+    return {
+      ...model,
+      position: [
+        model.position[0] + dx,
+        model.position[1],
+        model.position[2] + dz,
+      ] as [number, number, number],
+    };
+  });
+  if (memberIds.size <= 1) {
+    if (commit) vm.updateModel(active.id, { position });
+    else vm.previewModel(active.id, { position });
+  } else {
+    vm.updateModels(next);
+  }
+  if (commit && !isLightTrussModel(active)) vm.setPendingSnapModelId(active.id);
+}
 
 export function TheaterSceneLayout({
   vm,
@@ -159,9 +214,19 @@ export function TheaterSceneLayout({
   individualModels,
   isModelEditMode,
   onSelectModel,
-  onFocusModel,
+  onModelContextMenu,
   onSelectSpotlight,
   onFocusSpotlight,
+  spotlightContextMenu,
+  onSpotlightContextPick,
+  onSpotlightContextColorChange,
+  onSpotlightContextRangeChange,
+  onSpotlightContextRangeStart,
+  onSpotlightContextRangeCommit,
+  onCloseSpotlightContext,
+  modelContextMenu,
+  onModelContextPick,
+  onCloseModelContext,
   onLayoutSizePreview,
   onLayoutSizeCommit,
   onLayoutSizeDragStart,
@@ -776,8 +841,11 @@ export function TheaterSceneLayout({
               snapToGrid={vm.snapToGrid}
               gridStep={vm.gridStep}
               onSelectModel={(id, additive) => onSelectModel(id, additive)}
-              onModelContextMenu={(id) => onFocusModel(id)}
+              onModelContextMenu={onModelContextMenu}
               onSelectSpotlight={(id, additive) => onSelectSpotlight(id, additive)}
+              onSpotlightContextMenu={(id, clientX, clientY) =>
+                onFocusSpotlight(id, clientX, clientY)
+              }
               onSelectDoor={vm.setActiveDoorId}
               onSelectRecess={vm.setActiveRecessId}
               onSelectOpening={vm.setActiveOpeningId}
@@ -874,6 +942,7 @@ export function TheaterSceneLayout({
               wallsHideFromCamera={vm.wallsHideFromCamera}
               dutyLightEnabled={vm.dutyLightEnabled && !vm.liveBlackoutEnabled}
               smokeMachineEnabled={vm.smokeMachineEnabled}
+              smokePanelOpen={vm.smokePanelOpen}
               smokePosition={smokePosition}
               smokeIntensity={vm.smokeIntensity}
               smokeSaturation={vm.smokeSaturation}
@@ -901,7 +970,9 @@ export function TheaterSceneLayout({
               onSpotlightTargetChange={(id, target) => vm.updateSpotlight(id, { target })}
               onSpotlightPositionChange={(id, position) => vm.updateSpotlight(id, { position })}
               onSpotlightSelect={(id, additive) => onSelectSpotlight(id, additive)}
-              onSpotlightContextMenu={(id) => onFocusSpotlight(id)}
+              onSpotlightContextMenu={(id, clientX, clientY) =>
+                onFocusSpotlight(id, clientX, clientY)
+              }
               onSpotlightDragStart={vm.beginTheaterHistoryTransaction}
               onSpotlightDragEnd={vm.endTheaterHistoryTransaction}
               onDraggingChange={vm.setIsDragging}
@@ -912,12 +983,12 @@ export function TheaterSceneLayout({
               hoveredModelId={vm.hoveredModelId}
               isModelEditMode={isModelEditMode}
               onModelSelect={(id, additive) => onSelectModel(id, additive)}
-              onModelContextMenu={(id) => onFocusModel(id)}
+              onModelContextMenu={onModelContextMenu}
               onModelHoverChange={vm.setHoveredModelId}
               onModelActivate={(id) => {
-                if (vm.activeModelId === id) return;
                 onSelectModel(id);
                 vm.setModelTransformMode("translate");
+                vm.setModelDragArmed(true);
                 const model = vm.models.find((item) => item.id === id);
                 if (model) requestTheaterCameraFocus(focusCameraForModel(model, vm.layout));
               }}
@@ -925,6 +996,7 @@ export function TheaterSceneLayout({
               activeModelObject={vm.activeModelObject}
               activeModelObjectId={vm.activeModelObjectId ?? undefined}
               modelTransformMode={vm.modelTransformMode}
+              modelDragArmed={vm.modelDragArmed}
               onModelTransformStart={vm.handleModelTransformStart}
               onTrussMountPointClick={(
                 modelId,
@@ -945,53 +1017,10 @@ export function TheaterSceneLayout({
               onModelTransformChange={vm.handleModelTransformChange}
               activeModel={vm.activeModel}
               onModelFloorMovePreview={(position) => {
-                const active = vm.activeModel;
-                if (!active) return;
-                const dx = position[0] - active.position[0];
-                const dz = position[2] - active.position[2];
-                const selectedIds =
-                  vm.multiSelectedModelIds.length > 1
-                    ? vm.multiSelectedModelIds
-                    : [active.id];
-                for (const id of selectedIds) {
-                  const model = vm.models.find((item) => item.id === id);
-                  if (!model) continue;
-                  const nextPosition: [number, number, number] =
-                    id === active.id
-                      ? position
-                      : [
-                          model.position[0] + dx,
-                          model.position[1],
-                          model.position[2] + dz,
-                        ];
-                  vm.previewModel(id, { position: nextPosition });
-                }
+                moveModelsAsFigure(vm, position, false);
               }}
               onModelFloorMoveCommit={(position) => {
-                const active = vm.activeModel;
-                if (!active) return;
-                const selectedIds =
-                  vm.multiSelectedModelIds.length > 1
-                    ? vm.multiSelectedModelIds
-                    : [active.id];
-                if (selectedIds.length <= 1) {
-                  vm.updateModel(active.id, { position });
-                  if (!isLightTrussModel(active)) {
-                    vm.setPendingSnapModelId(active.id);
-                  }
-                  return;
-                }
-                const selected = new Set(selectedIds);
-                vm.updateModels(
-                  vm.models.map((model) => {
-                    if (!selected.has(model.id)) return model;
-                    if (model.id === active.id) return { ...model, position };
-                    return model;
-                  }),
-                );
-                if (!isLightTrussModel(active)) {
-                  vm.setPendingSnapModelId(active.id);
-                }
+                moveModelsAsFigure(vm, position, true);
               }}
               onModelFloorMoveDragStart={vm.beginTheaterHistoryTransaction}
               onModelFloorMoveDragEnd={vm.endTheaterHistoryTransaction}
@@ -1145,6 +1174,32 @@ export function TheaterSceneLayout({
             }
             onClose={closeObjectContextMenu}
           />
+          {modelContextMenu ? (
+            <TheaterObjectContextMenu
+              open
+              x={modelContextMenu.x}
+              y={modelContextMenu.y}
+              title={modelContextMenu.title}
+              items={modelContextMenu.items}
+              onPick={onModelContextPick}
+              onClose={onCloseModelContext}
+            />
+          ) : null}
+          {spotlightContextMenu ? (
+            <TheaterObjectContextMenu
+              open
+              x={spotlightContextMenu.x}
+              y={spotlightContextMenu.y}
+              title={spotlightContextMenu.title}
+              items={spotlightContextMenu.items}
+              onPick={onSpotlightContextPick}
+              onColorChange={onSpotlightContextColorChange}
+              onRangeChange={onSpotlightContextRangeChange}
+              onRangeStart={onSpotlightContextRangeStart}
+              onRangeCommit={onSpotlightContextRangeCommit}
+              onClose={onCloseSpotlightContext}
+            />
+          ) : null}
           <input
             ref={wallTextureInputRef}
             type="file"

@@ -81,6 +81,9 @@ export function recordLightKadrForSection(input: RecordLightKadrInput): RecordLi
       ? { smokeDurationSec: existing.smokeDurationSec }
       : {}),
     ...(existing?.smokeMachine ? { smokeMachine: true } : {}),
+    ...(existing?.theaterSnapshot
+      ? { theaterSnapshot: existing.theaterSnapshot }
+      : {}),
   };
 
   const nextKadrs = upsertKadrInScene({ kadrs: input.kadrs, kadr: preserved });

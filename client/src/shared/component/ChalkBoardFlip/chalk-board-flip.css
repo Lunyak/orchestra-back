@@ -1,0 +1,204 @@
+html:has(.chalk-flip),
+body:has(.chalk-flip) {
+  height: 100%;
+  overflow: hidden;
+}
+
+.chalk-flip {
+  --board-w: min(78vw, calc(88dvh * 9 / 16));
+  --board-h: 88dvh;
+  --depth: 72px;
+
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100dvh;
+  background-color: #050505;
+  background-image: linear-gradient(var(--afisha-page-bg, transparent), var(--afisha-page-bg, transparent));
+  perspective: 980px;
+  perspective-origin: 50% 42%;
+  overflow: hidden;
+}
+
+.chalk-flip__rotor {
+  position: relative;
+  width: var(--board-w);
+  height: var(--board-h);
+  transform-style: preserve-3d;
+}
+
+.chalk-flip__rotor--back {
+  transform: rotateY(-180deg);
+}
+
+.chalk-flip__rotor--turn-back {
+  animation: chalk-turn-back 1.35s cubic-bezier(0.45, 0.02, 0.2, 1) forwards;
+}
+
+.chalk-flip__rotor--turn-front {
+  animation: chalk-turn-front 1.35s cubic-bezier(0.45, 0.02, 0.2, 1) forwards;
+}
+
+.chalk-flip__face,
+.chalk-flip__edge {
+  position: absolute;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.chalk-flip__face {
+  inset: 0;
+  background-color: #050505;
+  background-image:
+    radial-gradient(ellipse 80% 60% at 50% 35%, rgba(0, 251, 255, 0.04), transparent 60%),
+    url("../../assets/brand/chalk-home-board-plain.png");
+  background-position: center top;
+  background-size: auto 100%;
+  background-repeat: no-repeat;
+}
+
+.chalk-flip__face--front {
+  transform: translateZ(calc(var(--depth) / 2));
+}
+
+.chalk-flip__face--back {
+  transform: rotateY(180deg) translateZ(calc(var(--depth) / 2));
+}
+
+.chalk-flip__face-clip {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.chalk-flip__face--back .chalk-flip__face-clip {
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(205, 198, 182, 0.45) transparent;
+}
+
+.chalk-flip__face--back .chalk-flip__face-clip::-webkit-scrollbar {
+  width: 8px;
+}
+
+.chalk-flip__face--back .chalk-flip__face-clip::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chalk-flip__face--back .chalk-flip__face-clip::-webkit-scrollbar-thumb {
+  background: rgba(205, 198, 182, 0.4);
+}
+
+.chalk-flip__rotor--turn-back .chalk-flip__face-clip,
+.chalk-flip__rotor--turn-front .chalk-flip__face-clip,
+.chalk-flip__rotor--turn-back .chalk-page,
+.chalk-flip__rotor--turn-front .chalk-page {
+  overflow: hidden;
+}
+
+.chalk-flip__rotor:not(.chalk-flip__rotor--back):not(.chalk-flip__rotor--turn-front) .chalk-flip__face--back {
+  pointer-events: none;
+}
+
+.chalk-flip__rotor--back .chalk-flip__face--front,
+.chalk-flip__rotor--turn-back .chalk-flip__face--front {
+  pointer-events: none;
+}
+
+.chalk-flip__edge {
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, #070707 0%, #3c3c3c 16%, #171717 48%, #2a2a2a 84%, #070707 100%);
+}
+
+.chalk-flip__edge--left,
+.chalk-flip__edge--right {
+  top: 0;
+  width: var(--depth);
+  height: 100%;
+  left: calc(50% - var(--depth) / 2);
+}
+
+.chalk-flip__edge--left {
+  transform: rotateY(-90deg) translateZ(calc(var(--board-w) / 2));
+}
+
+.chalk-flip__edge--right {
+  transform: rotateY(90deg) translateZ(calc(var(--board-w) / 2));
+}
+
+.chalk-flip__edge--top,
+.chalk-flip__edge--bottom {
+  left: 0;
+  width: 100%;
+  height: var(--depth);
+  background:
+    linear-gradient(180deg, #070707 0%, #343434 18%, #151515 52%, #2c2c2c 84%, #070707 100%);
+}
+
+.chalk-flip__edge--top {
+  top: calc(50% - var(--depth) / 2);
+  transform: rotateX(-90deg) translateZ(calc(var(--board-h) / 2));
+}
+
+.chalk-flip__edge--bottom {
+  top: calc(50% - var(--depth) / 2);
+  transform: rotateX(90deg) translateZ(calc(var(--board-h) / 2));
+}
+
+.chalk-flip .home-page--chalk,
+.chalk-flip .chalk-page--in-flip {
+  height: 100%;
+  min-height: 100%;
+  background: transparent;
+}
+
+.chalk-flip__face--front .home-page--chalk {
+  overflow: hidden;
+}
+
+.chalk-flip .chalk-page__stage {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+}
+
+.chalk-flip__face--back .chalk-page__stage--scroll {
+  height: auto;
+  min-height: 100%;
+}
+
+.chalk-flip .chalk-page__wear {
+  display: none;
+}
+
+@keyframes chalk-turn-back {
+  0% {
+    transform: rotateY(0deg) translateZ(0);
+  }
+
+  42% {
+    transform: rotateY(-108deg) translateZ(190px);
+  }
+
+  100% {
+    transform: rotateY(-180deg) translateZ(0);
+  }
+}
+
+@keyframes chalk-turn-front {
+  0% {
+    transform: rotateY(-180deg) translateZ(0);
+  }
+
+  42% {
+    transform: rotateY(-72deg) translateZ(190px);
+  }
+
+  100% {
+    transform: rotateY(0deg) translateZ(0);
+  }
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import cn from "classnames";
 import { useAppEditorMenubarActionsRender } from "@shared/components/app-editor-menubar";
@@ -8,10 +8,13 @@ import {
   patchSceneFaderLevel,
 } from "../model/sync-spotlight-fader-level";
 import {
+  bindSpotlightOnFaderBoard,
+  detachSpotlightFromFaderBoard,
   readSpotlightChannel,
   readSpotlightFaderId,
 } from "../model/theater-light-fader-bindings";
 import {
+  buildCompleteLightFaders,
   resolveLightProgramMinCount,
   resolveLightPrograms,
   upsertChannelMemorySnapshot,
@@ -44,10 +47,19 @@ import { writeSceneTheaterModels } from "../model/theater-scene-models";
 import type { TheaterModel, TheaterSpotlight } from "../../../shared/types/script";
 import { TheaterControls } from "./TheaterControls";
 import { isTheaterDecorModel } from "../model/theater-decor-catalog";
+import {
+  modelGroupMemberIds,
+  selectionHasModelGroup,
+} from "../model/theater-model-groups";
 import { isLightTrussModel } from "../model/theater-truss-mounts";
 import { resolveSmokePosition } from "../model/theater-smoke-settings";
 import { useMobileTheaterLayout } from "../model/theater-mobile-layout";
 import { TheaterSceneLayout } from "./TheaterSceneLayout";
+import type { TheaterObjectContextMenuItem } from "./TheaterObjectContextMenu";
+import {
+  buildSpotlightContextMenuItems,
+  spotlightPresetColor,
+} from "./theater-spotlight-context-items";
 import "./style.css";
 import "./theater-editor-sidebar.css";
 
@@ -290,8 +302,23 @@ export const TheaterScene = ({
       if (vm.spectaclePreviewMode) {
         vm.setSpectaclePreviewMode(false);
       }
+      vm.setModelDragArmed(false);
       vm.setEditMode(isDecor ? "decor" : "models");
+      const groupIds = modelGroupMemberIds(vm.models, id);
       vm.selectTheaterModel(id, additive);
+      if (groupIds.length > 1) {
+        vm.setMultiSelectedModelIds((prev) => {
+          if (!additive) return groupIds;
+          const selected = new Set(prev);
+          const groupSelected = groupIds.every((memberId) => selected.has(memberId));
+          if (groupSelected) {
+            groupIds.forEach((memberId) => selected.delete(memberId));
+            return selected.size > 0 ? [...selected] : [id];
+          }
+          groupIds.forEach((memberId) => selected.add(memberId));
+          return [...selected];
+        });
+      }
     },
     [
       vm.exitDecorPlaceMode,
@@ -301,22 +328,45 @@ export const TheaterScene = ({
       vm.setEditMode,
       vm.setLayoutOutlineFocused,
       vm.setLightRigFocused,
+      vm.setModelDragArmed,
+      vm.setMultiSelectedModelIds,
       vm.setSpectaclePreviewMode,
       vm.setStageGridFocused,
       vm.spectaclePreviewMode,
     ],
   );
 
-  const focusModel = useCallback(
-    (modelId: number) => {
-      selectModel(modelId, false);
+  const [spotlightContext, setSpotlightContext] = useState<{
+    id: number;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [modelContext, setModelContext] = useState<{
+    id: number;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const openModelContext = useCallback(
+    (id: number, clientX: number, clientY: number) => {
+      if (!vm.multiSelectedModelIds.includes(id)) {
+        selectModel(id, false);
+      }
+      setSpotlightContext(null);
+      setModelContext({ id, x: clientX, y: clientY });
     },
-    [selectModel],
+    [selectModel, vm.multiSelectedModelIds],
   );
 
+  const closeModelContext = useCallback(() => {
+    setModelContext(null);
+  }, []);
+
   const focusSpotlight = useCallback(
-    (spotlightId: number) => {
+    (spotlightId: number, clientX: number, clientY: number) => {
       selectSpotlight(spotlightId, false);
+      setModelContext(null);
+      setSpotlightContext({ id: spotlightId, x: clientX, y: clientY });
     },
     [selectSpotlight],
   );
@@ -388,7 +438,8 @@ export const TheaterScene = ({
           vm.updateSpotlight(activeSpotlight.id, {
             hidden: activeSpotlight.hidden !== true,
           }),
-        onPickDragMode: (mode: "target" | "source") => vm.setDragMode(mode),
+        onPickDragMode: (mode: "target" | "source") =>
+          vm.setDragMode(vm.dragMode === mode ? null : mode),
         onAngleChange: (angleDeg: number) =>
           vm.updateSpotlight(activeSpotlight.id, { angleDeg }),
         onIntensityChange: (intensity: number) => {
@@ -432,6 +483,255 @@ export const TheaterScene = ({
       }
     : null;
 
+  const menuSpotlight =
+    spotlightContext == null
+      ? null
+      : (vm.displaySpotlights.find((item) => item.id === spotlightContext.id) ??
+        null);
+  const spotlightContextMatches =
+    menuSpotlight != null &&
+    spotlightFocusPanelProps != null &&
+    menuSpotlight.id === spotlightFocusPanelProps.spotlight.id;
+  const lightChannelCount = Array.isArray(playbookData?.lightChannels)
+    ? playbookData.lightChannels.length
+    : 0;
+  const faderCount =
+    playbookData?.lightFaders?.v === 1 ? playbookData.lightFaders.faders.length : 0;
+  const spotlightContextMenu =
+    spotlightContextMatches && spotlightContext && menuSpotlight
+      ? {
+          x: spotlightContext.x,
+          y: spotlightContext.y,
+          title: menuSpotlight.isRgb
+            ? `RGB · ${menuSpotlight.label}`
+            : menuSpotlight.label,
+          items: buildSpotlightContextMenuItems({
+            spotlight: menuSpotlight,
+            dragMode: vm.dragMode,
+            aimMode: vm.spotlightAimMode,
+            gridCol: highlightGridCell?.col ?? menuSpotlight.gridCol,
+            gridRow: highlightGridCell?.row ?? menuSpotlight.gridRow,
+            trusses: vm.models.filter((model) => model.builtin === "lightTruss6m"),
+            spotlights: vm.spotlights,
+            channelCount: lightChannelCount,
+            faderCount,
+          }),
+        }
+      : null;
+
+  const closeSpotlightContext = useCallback(() => {
+    setSpotlightContext(null);
+  }, []);
+
+  const modelContextTarget =
+    modelContext == null
+      ? null
+      : (vm.models.find((item) => item.id === modelContext.id) ?? null);
+  const modelContextSelection = modelContextTarget
+    ? vm.multiSelectedModelIds.includes(modelContextTarget.id)
+      ? vm.multiSelectedModelIds
+      : [modelContextTarget.id]
+    : [];
+  const modelContextItems: TheaterObjectContextMenuItem[] = [];
+  if (modelContextSelection.length >= 2) {
+    const groupIds = modelContextSelection.map(
+      (id) => vm.models.find((item) => item.id === id)?.groupId,
+    );
+    const alreadyOneGroup =
+      groupIds[0] != null && groupIds.every((groupId) => groupId === groupIds[0]);
+    if (!alreadyOneGroup) {
+      modelContextItems.push({ id: "group:join", label: "Объединить" });
+    }
+  }
+  if (modelContextTarget && selectionHasModelGroup(vm.models, [modelContextTarget.id])) {
+    modelContextItems.push({ id: "group:split", label: "Разбить" });
+  }
+  const modelContextMenu =
+    modelContext && modelContextTarget && modelContextItems.length > 0
+      ? {
+          x: modelContext.x,
+          y: modelContext.y,
+          title: modelContextTarget.name,
+          items: modelContextItems,
+        }
+      : null;
+
+  const handleModelContextPick = useCallback(
+    (actionId: string) => {
+      if (actionId === "group:join") vm.groupSelectedModels();
+      if (actionId === "group:split") vm.ungroupSelectedModels();
+    },
+    [vm],
+  );
+
+  const bindMenuSpotlightFader = useCallback(
+    (faderId: number, spotlightId: number, channel: number) => {
+      setPlaybookData((prev) => {
+        const current = prev?.lightFaders?.v === 1 ? prev.lightFaders.faders : [];
+        const nextFaderRows = bindSpotlightOnFaderBoard(
+          current,
+          faderId,
+          spotlightId,
+          channel,
+        );
+        const nextFaders = buildCompleteLightFaders({
+          v: 1,
+          count: nextFaderRows.length,
+          faders: nextFaderRows,
+        });
+        const channelCount = Math.max(
+          channel,
+          Array.isArray(prev?.lightChannels) ? prev.lightChannels.length : channel,
+        );
+        const programs = resolveLightPrograms(
+          prev?.lightPrograms,
+          resolveLightProgramMinCount(channelCount, prev?.lightPrograms, channel),
+          channelCount,
+        );
+        return {
+          ...(prev ?? {}),
+          lightFaders: nextFaders,
+          lightPrograms: upsertChannelMemorySnapshot(
+            programs,
+            channel,
+            nextFaders,
+            channelCount,
+          ),
+        };
+      });
+      window.setTimeout(() => {
+        void saveScenesForLightPlot({ force: true });
+      }, 0);
+    },
+    [saveScenesForLightPlot, setPlaybookData],
+  );
+
+  const handleSpotlightContextPick = useCallback(
+    (actionId: string) => {
+      const panel = spotlightFocusPanelProps;
+      const spotlight = menuSpotlight;
+      if (!panel || !spotlight || spotlight.id !== panel.spotlight.id) return;
+      if (actionId === "state:power") {
+        panel.onToggleEnabled();
+        return;
+      }
+      if (actionId === "state:visibility") {
+        panel.onToggleHidden();
+        return;
+      }
+      if (actionId === "aim:point") {
+        panel.onPickAimMode("point");
+        return;
+      }
+      if (actionId === "aim:cell") {
+        panel.onPickAimMode("cell");
+        return;
+      }
+      if (actionId === "aim:clear-cell") {
+        panel.onClearGridBinding?.();
+        return;
+      }
+      if (actionId === "aim:stage") {
+        vm.aimSelectedSpotlightsAtStage();
+        return;
+      }
+      if (actionId === "drag:source") {
+        panel.onPickDragMode("source");
+        return;
+      }
+      if (actionId === "drag:target") {
+        panel.onPickDragMode("target");
+        return;
+      }
+      if (actionId === "mount:detach") {
+        panel.onDetachFromTruss();
+        return;
+      }
+      if (actionId.startsWith("mount:")) {
+        const rest = actionId.slice("mount:".length);
+        const separator = rest.indexOf(":");
+        if (separator <= 0) return;
+        const mountModelId = Number(rest.slice(0, separator));
+        const mountPointId = rest.slice(separator + 1);
+        if (!Number.isFinite(mountModelId) || !mountPointId) return;
+        panel.onAttachToTruss(mountModelId, mountPointId);
+        return;
+      }
+      if (actionId.startsWith("light:preset:")) {
+        const color = spotlightPresetColor(actionId.slice("light:preset:".length));
+        if (color) panel.onColorChange(color);
+        return;
+      }
+      if (actionId.startsWith("channel:")) {
+        const channel = Math.max(1, Number(actionId.slice("channel:".length)) || 1);
+        vm.updateSpotlight(spotlight.id, { channel });
+        const faderId = readSpotlightFaderId(spotlight);
+        if (faderId != null) bindMenuSpotlightFader(faderId, spotlight.id, channel);
+        return;
+      }
+      if (actionId === "fader:none") {
+        vm.updateSpotlight(spotlight.id, { faderId: undefined });
+        setPlaybookData((prev) => ({
+          ...(prev ?? {}),
+          lightFaders: {
+            v: 1,
+            faders: detachSpotlightFromFaderBoard(
+              prev?.lightFaders?.v === 1 ? prev.lightFaders.faders : [],
+              spotlight.id,
+            ),
+          },
+        }));
+        window.setTimeout(() => {
+          void saveScenesForLightPlot({ force: true });
+        }, 0);
+        return;
+      }
+      if (actionId.startsWith("fader:")) {
+        const faderId = Math.max(1, Number(actionId.slice("fader:".length)) || 1);
+        const channel = spotlight.channel ?? spotlight.id;
+        vm.updateSpotlight(spotlight.id, { faderId });
+        bindMenuSpotlightFader(faderId, spotlight.id, channel);
+        return;
+      }
+      if (actionId === "model:low-detail") {
+        vm.updateSpotlight(spotlight.id, {
+          modelLowDetail: spotlight.modelLowDetail !== true,
+        });
+        return;
+      }
+      if (actionId === "object:clone") {
+        panel.onClone?.();
+        return;
+      }
+      if (actionId === "object:delete") {
+        panel.onDelete?.();
+      }
+    },
+    [
+      bindMenuSpotlightFader,
+      menuSpotlight,
+      saveScenesForLightPlot,
+      setPlaybookData,
+      spotlightFocusPanelProps,
+      vm,
+    ],
+  );
+
+  const handleSpotlightContextColorChange = useCallback(
+    (_id: string, color: string) => {
+      spotlightFocusPanelProps?.onColorChange(color);
+    },
+    [spotlightFocusPanelProps],
+  );
+
+  const handleSpotlightContextRangeChange = useCallback(
+    (id: string, value: number) => {
+      if (id === "light:angle") spotlightFocusPanelProps?.onAngleChange(value);
+      if (id === "light:intensity") spotlightFocusPanelProps?.onIntensityChange(value);
+    },
+    [spotlightFocusPanelProps],
+  );
+
   const modelFocusPanelProps = (() => {
     const activeModel = vm.activeModel;
     if (!activeModel || !showModelFocusPanel) return null;
@@ -451,6 +751,7 @@ export const TheaterScene = ({
         vm.setPendingSnapModelId(modelId);
       },
       transformMode: vm.modelTransformMode,
+      transformArmed: vm.modelDragArmed,
       showDecorActions: isDecorEditMode,
       hidden: activeModel.hidden === true,
       onToggleHidden: () =>
@@ -462,9 +763,14 @@ export const TheaterScene = ({
         vm.updateModel(modelId, { isRequisite: next });
       },
       onPickTransform: (mode: "translate" | "rotate" | "scale") => {
+        if (vm.modelDragArmed && vm.modelTransformMode === mode) {
+          vm.setModelDragArmed(false);
+          return;
+        }
         vm.exitDecorPlaceMode();
         vm.setEditMode(isDecorEditMode ? "decor" : "models");
         vm.setModelTransformMode(mode);
+        vm.setModelDragArmed(true);
       },
       onRotateQuarter: (direction: "cw" | "ccw") =>
         vm.rotateActiveModel(direction),
@@ -526,9 +832,19 @@ export const TheaterScene = ({
       individualModels={individualModels}
       isModelEditMode={isModelEditMode}
       onSelectModel={selectModel}
-      onFocusModel={focusModel}
+      onModelContextMenu={openModelContext}
       onSelectSpotlight={selectSpotlight}
       onFocusSpotlight={focusSpotlight}
+      spotlightContextMenu={spotlightContextMenu}
+      onSpotlightContextPick={handleSpotlightContextPick}
+      onSpotlightContextColorChange={handleSpotlightContextColorChange}
+      onSpotlightContextRangeChange={handleSpotlightContextRangeChange}
+      onSpotlightContextRangeStart={vm.beginTheaterHistoryTransaction}
+      onSpotlightContextRangeCommit={vm.endTheaterHistoryTransaction}
+      onCloseSpotlightContext={closeSpotlightContext}
+      modelContextMenu={modelContextMenu}
+      onModelContextPick={handleModelContextPick}
+      onCloseModelContext={closeModelContext}
       onLayoutSizePreview={(result) =>
         applyHallExpandResult(result, "preview")
       }

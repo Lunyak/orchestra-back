@@ -107,8 +107,9 @@ export interface SceneLightKadrV1 {
   /** Markdown-фрагмент картинки для превью в ленте. */
   imageMarkdown?: string;
   /**
-   * Снапшот мизансцены 3D на момент записи картины.
-   * При выборе картины в театре восстанавливает сет.
+   * Сет картины (модели, декор, софиты).
+   * Пока картин нет, этот сет лежит на самой сцене.
+   * Выбор картины показывает снимок во вьюпорте и не переписывает сцену.
    */
   theaterSnapshot?: SceneLightKadrTheaterSnapshotV1;
   note?: string;
@@ -191,8 +192,12 @@ export interface TheaterModel {
     | "libraryWoodenChair"
     | "libraryVelvetArmchair"
     | "libraryVelvetSofa"
+    | "librarySofa02"
+    | "librarySofa03"
     | "libraryDiningTable"
+    | "libraryDiningTable02"
     | "libraryRoundPedestalTable"
+    | "libraryRoundWoodenTable"
     | "libraryBarStool"
     | "libraryPaintedWoodenStool"
     | "libraryPaintedWoodenChair"
@@ -262,6 +267,8 @@ export interface TheaterModel {
   hidden?: boolean;
   /** Модель помечена как реквизит сцены. */
   isRequisite?: boolean;
+  /** Общая группа: объекты с одним groupId двигаются вместе. */
+  groupId?: number;
   position: [number, number, number];
   rotation: [number, number, number];
   scale: [number, number, number];

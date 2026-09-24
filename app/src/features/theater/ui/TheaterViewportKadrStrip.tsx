@@ -2,7 +2,11 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointer
 import { usePlaybook } from "../../playbook";
 import { findKadrById, readSceneLightKadrs } from "../model/light-kadrs";
 import { applyKadrLook } from "../model/kadr-store";
-import { buildTheaterSnapshotScenePatch } from "../model/kadr-theater-snapshot";
+import { readSceneTheaterModels } from "../model/theater-scene-models";
+import {
+  enterTheaterKadrEdit,
+  exitTheaterKadrEdit,
+} from "../model/theater-active-kadr";
 import { clampKadrStripHeight } from "../model/theater-view-prefs-storage";
 import { resolveLightFaders } from "../../../shared/components/light-console/light-console-data";
 import {
@@ -20,7 +24,7 @@ export type TheaterViewportKadrStripProps = {
 
 /** Горизонтальная лента сцен/картин поверх 3D viewport. */
 export function TheaterViewportKadrStrip({ vm }: TheaterViewportKadrStripProps) {
-  const { scenes, playbookData, setPlaybookData, updateScene, setCurrentPage } = usePlaybook();
+  const { scenes, playbookData, setPlaybookData, setCurrentPage } = usePlaybook();
   const tape = useMemo(() => buildSpectacleKadrTape(scenes), [scenes]);
   const [tapeIndex, setTapeIndex] = useState(0);
   const resizeRef = useRef<{ startY: number; startHeight: number } | null>(null);
@@ -30,16 +34,60 @@ export function TheaterViewportKadrStrip({ vm }: TheaterViewportKadrStripProps) 
     [playbookData?.lightChannels],
   );
 
-  useEffect(() => {
+  const resolvedTapeIndex = (() => {
     const current = tape[tapeIndex];
-    if (current && current.sceneIndex === vm.currentPage) return;
+    if (current && current.sceneIndex === vm.currentPage) return tapeIndex;
     const nextIndex = findTapeIndexForSceneKadr(tape, vm.currentPage, null);
-    if (nextIndex >= 0) setTapeIndex(nextIndex);
-  }, [tape, tapeIndex, vm.currentPage]);
+    return nextIndex >= 0 ? nextIndex : tapeIndex;
+  })();
+  const resolvedItem = tape[resolvedTapeIndex];
+  const activeKadrId =
+    resolvedItem &&
+    resolvedItem.sceneIndex === vm.currentPage &&
+    !resolvedItem.isPlaceholder &&
+    resolvedItem.kadrId
+      ? resolvedItem.kadrId
+      : null;
+
+  useEffect(() => {
+    if (tapeIndex === resolvedTapeIndex) return;
+    setTapeIndex(resolvedTapeIndex);
+  }, [resolvedTapeIndex, tapeIndex]);
+
+  useEffect(() => {
+    if (!activeKadrId) {
+      exitTheaterKadrEdit();
+      return;
+    }
+    const scene = scenes[vm.currentPage];
+    if (!scene) return;
+    const kadr = findKadrById(readSceneLightKadrs(scene), activeKadrId);
+    if (!kadr) {
+      exitTheaterKadrEdit();
+      return;
+    }
+    const snapshot = kadr.theaterSnapshot;
+    const models = snapshot
+      ? [
+          ...(snapshot.theaterModels ?? []),
+          ...(snapshot.theaterDecor ?? []),
+        ]
+      : readSceneTheaterModels(scene);
+    const spotlights = snapshot?.theaterSpotlights ?? scene.theaterSpotlights ?? [];
+    enterTheaterKadrEdit({
+      id: kadr.id,
+      title: kadr.title?.trim() || `Кадр ${kadr.kadrNo}`,
+      models,
+      spotlights,
+    });
+  }, [activeKadrId, scenes, vm.currentPage]);
 
   const onSelectIndex = (index: number) => {
     const item = tape[index];
     if (!item) return;
+
+    const enteringKadrId =
+      item.isPlaceholder || !item.kadrId ? null : item.kadrId;
 
     setTapeIndex(index);
 
@@ -47,12 +95,29 @@ export function TheaterViewportKadrStrip({ vm }: TheaterViewportKadrStripProps) 
       setCurrentPage(item.sceneIndex);
     }
 
-    if (item.isPlaceholder || !item.kadrId) return;
+    if (!enteringKadrId) {
+      exitTheaterKadrEdit();
+      return;
+    }
 
     const targetScene = scenes[item.sceneIndex];
     if (!targetScene) return;
-    const kadr = findKadrById(readSceneLightKadrs(targetScene), item.kadrId);
+    const kadr = findKadrById(readSceneLightKadrs(targetScene), enteringKadrId);
     if (!kadr) return;
+
+    const snapshot = kadr.theaterSnapshot;
+    const models = snapshot
+      ? [
+          ...(snapshot.theaterModels ?? []),
+          ...(snapshot.theaterDecor ?? []),
+        ]
+      : readSceneTheaterModels(targetScene);
+    enterTheaterKadrEdit({
+      id: kadr.id,
+      title: kadr.title?.trim() || `Кадр ${kadr.kadrNo}`,
+      models,
+      spotlights: snapshot?.theaterSpotlights ?? targetScene.theaterSpotlights ?? [],
+    });
 
     const baseFaders = resolveLightFaders(playbookData?.lightFaders ?? undefined);
     const look = applyKadrLook(kadr, baseFaders);
@@ -68,15 +133,6 @@ export function TheaterViewportKadrStrip({ vm }: TheaterViewportKadrStripProps) 
         ...(nextPrograms ? { lightPrograms: nextPrograms } : {}),
       };
     });
-
-    if (kadr.theaterSnapshot) {
-      updateScene(targetScene.id, buildTheaterSnapshotScenePatch(kadr.theaterSnapshot));
-      return;
-    }
-
-    if (look.smokeMachine != null) {
-      vm.setSmokeMachineEnabled(look.smokeMachine);
-    }
   };
 
   const handleResizePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {

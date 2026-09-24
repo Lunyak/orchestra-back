@@ -1,6 +1,11 @@
 import { createBrowserRouter } from "react-router-dom";
 // import EventPage from "../page/EventPage/EventPage";
 import App from "../App";
+import { Component as AboutUs } from "../page/AboutUs/AboutUs";
+import { Component as ContactsPage } from "../page/ContactsPage/ContactsPage";
+import { Component as EventsPage } from "../page/EventsPage/EventsPage";
+import { Component as HomePage } from "../page/HomePage/HomePage";
+import { ChalkBoardFlipLayout } from "../shared/component/ChalkBoardFlip/ChalkBoardFlip";
 import { ROUTES } from "../shared/model/routes";
 
 export const router = createBrowserRouter([
@@ -9,12 +14,37 @@ export const router = createBrowserRouter([
     path: ROUTES.HOME,
     children: [
       {
-        path: ROUTES.EVENTS,
-        lazy: () => import("../page/EventsPage/EventsPage"),
-      },
-      {
-        path: ROUTES.LEGACY_EVENTS,
-        lazy: () => import("../page/EventsPage/EventsPage"),
+        element: <ChalkBoardFlipLayout />,
+        children: [
+          {
+            path: ROUTES.HOME,
+            element: <HomePage />,
+          },
+          {
+            path: ROUTES.EVENTS,
+            element: <EventsPage />,
+          },
+          {
+            path: ROUTES.LEGACY_EVENTS,
+            element: <EventsPage />,
+          },
+          {
+            path: ROUTES.ABOUTUS,
+            element: <AboutUs />,
+          },
+          {
+            path: ROUTES.LEGACY_ABOUTUS,
+            element: <AboutUs />,
+          },
+          {
+            path: ROUTES.CONTACTS,
+            element: <ContactsPage />,
+          },
+          {
+            path: ROUTES.LEGACY_CONTACTS,
+            element: <ContactsPage />,
+          },
+        ],
       },
       {
         path: ROUTES.EVENT,
@@ -23,30 +53,6 @@ export const router = createBrowserRouter([
       {
         path: ROUTES.LEGACY_EVENT,
         lazy: () => import("../page/EventPage/EventPage"),
-      },
-      {
-        path: ROUTES.ABOUTUS,
-        lazy: () => import("../page/AboutUs/AboutUs"),
-      },
-      {
-        path: ROUTES.LEGACY_ABOUTUS,
-        lazy: () => import("../page/AboutUs/AboutUs"),
-      },
-      {
-        path: ROUTES.HOME,
-        lazy: () => import("../page/HomePage/HomePage"),
-      },
-      {
-        path: ROUTES.THEATER_WALK,
-        lazy: () => import("../page/TheaterWalk/TheaterWalkBlocked"),
-      },
-      {
-        path: ROUTES.CONTACTS,
-        lazy: () => import("../page/ContactsPage/ContactsPage"),
-      },
-      {
-        path: ROUTES.LEGACY_CONTACTS,
-        lazy: () => import("../page/ContactsPage/ContactsPage"),
       },
     ],
   },

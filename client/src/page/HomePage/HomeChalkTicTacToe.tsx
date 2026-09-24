@@ -55,6 +55,8 @@ export const HomeChalkTicTacToe: FC = () => {
   const winMorphIndexRef = useRef<number | null>(START_WIN_MORPH_INDEX);
   const winMorphRef = useRef(1);
   const skipFirstBoardPaintRef = useRef(true);
+  const triangleSpinRef = useRef(0);
+  const spinRafRef = useRef<number | null>(null);
 
   boardRef.current = board;
 
@@ -85,6 +87,7 @@ export const HomeChalkTicTacToe: FC = () => {
       gridProgress,
       winMorphIndex: winMorphIndexRef.current,
       winMorphProgress: winMorphRef.current,
+      triangleSpin: triangleSpinRef.current,
     });
   };
 
@@ -245,6 +248,7 @@ export const HomeChalkTicTacToe: FC = () => {
   useEffect(() => {
     return () => {
       stopAnimation();
+      stopTriangleSpin();
       if (timerRef.current !== null) window.clearTimeout(timerRef.current);
       if (morphTimerRef.current !== null) window.clearTimeout(morphTimerRef.current);
     };
@@ -294,6 +298,8 @@ export const HomeChalkTicTacToe: FC = () => {
 
   const resetGame = () => {
     stopAnimation();
+    stopTriangleSpin();
+    triangleSpinRef.current = 0;
     if (timerRef.current !== null) window.clearTimeout(timerRef.current);
     if (morphTimerRef.current !== null) window.clearTimeout(morphTimerRef.current);
     morphTimerRef.current = null;
@@ -323,7 +329,33 @@ export const HomeChalkTicTacToe: FC = () => {
     }, 650);
   };
 
+  const stopTriangleSpin = () => {
+    if (spinRafRef.current === null) return;
+    window.cancelAnimationFrame(spinRafRef.current);
+    spinRafRef.current = null;
+  };
+
+  const startTriangleSpin = () => {
+    if (spinRafRef.current !== null) return;
+
+    let last = performance.now();
+    const tick = (now: number) => {
+      const delta = now - last;
+      last = now;
+      triangleSpinRef.current += (delta / 1400) * Math.PI * 2;
+      paintStatic(boardRef.current, 1);
+      spinRafRef.current = window.requestAnimationFrame(tick);
+    };
+
+    spinRafRef.current = window.requestAnimationFrame(tick);
+  };
+
   const handleCellClick = (index: number) => {
+    if (winMorphIndex === index && gameOver) {
+      resetGame();
+      return;
+    }
+
     if (phase !== "player" || board[index] !== null || gameOver) return;
 
     const nextBoard = [...board];
@@ -366,7 +398,9 @@ export const HomeChalkTicTacToe: FC = () => {
                   isWinCell && "home-chalk-game__cell--win"
                 )}
                 onClick={() => handleCellClick(index)}
-                disabled={!canPlay || cell !== null}
+                onMouseEnter={isWinCell ? startTriangleSpin : undefined}
+                onMouseLeave={isWinCell ? stopTriangleSpin : undefined}
+                disabled={(!canPlay || cell !== null) && !isWinCell}
                 aria-label={`Клетка ${index + 1}: ${cellLabel}`}
               />
             );

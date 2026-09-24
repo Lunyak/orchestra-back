@@ -475,12 +475,17 @@ export function drawNeonLogoTriangle(
   cy: number,
   size: number,
   progress = 1,
-  seed = 911
+  seed = 911,
+  rotation = 0
 ) {
   const t = easeOutCubic(Math.max(0, Math.min(1, progress)));
   const height = size * (0.25 + t * 0.75);
+  const pivotY = cy + height / 6;
 
   ctx.save();
+  ctx.translate(cx, pivotY);
+  ctx.rotate(rotation);
+  ctx.translate(-cx, -pivotY);
   ctx.lineJoin = "miter";
   ctx.lineCap = "butt";
 

@@ -24,6 +24,7 @@ import {
 } from './theater-kit-catalog';
 
 const GLB_LIMIT = 80 * 1024 * 1024;
+const IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.webp'];
 
 type UploadedBin = {
   originalname: string;
@@ -58,7 +59,42 @@ export class AdminTheaterAssetsController {
     const lower = fileName.toLowerCase();
     if (lower.endsWith('.glb')) return 'model/gltf-binary';
     if (lower.endsWith('.gltf')) return 'model/gltf+json';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
     return fallback || 'application/octet-stream';
+  }
+
+  private isImageName(name: string): boolean {
+    const lower = name.toLowerCase();
+    return IMAGE_EXT.some((ext) => lower.endsWith(ext));
+  }
+
+  private assertImageFile(file: UploadedBin) {
+    const name = String(file.originalname ?? '').toLowerCase();
+    const head = file.buffer.subarray(0, 12);
+    const jpeg = head[0] === 0xff && head[1] === 0xd8;
+    const png = head[0] === 0x89 && head.toString('ascii', 1, 4) === 'PNG';
+    const webp =
+      head.toString('ascii', 0, 4) === 'RIFF' && head.toString('ascii', 8, 12) === 'WEBP';
+    const ok =
+      ((name.endsWith('.jpg') || name.endsWith('.jpeg')) && jpeg) ||
+      (name.endsWith('.png') && png) ||
+      (name.endsWith('.webp') && webp);
+    if (!ok) {
+      throw new BadRequestException('Файл не похож на изображение jpg, png или webp');
+    }
+  }
+
+  private assertKitFile(file: UploadedBin) {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('Файл не передан');
+    }
+    if (this.isImageName(String(file.originalname ?? ''))) {
+      this.assertImageFile(file);
+      return;
+    }
+    this.assertGlbFile(file);
   }
 
   private assertGlbFile(file: UploadedBin) {
@@ -83,8 +119,15 @@ export class AdminTheaterAssetsController {
     if (!isTheaterKitKey(normalized)) {
       throw new BadRequestException('Ключ должен начинаться с theater/');
     }
-    if (!normalized.toLowerCase().endsWith('.glb') && !normalized.toLowerCase().endsWith('.gltf')) {
-      throw new BadRequestException('Ключ должен указывать на .glb/.gltf');
+    const lower = normalized.toLowerCase();
+    const isModel = lower.endsWith('.glb') || lower.endsWith('.gltf');
+    if (isModel) return normalized;
+    if (!this.isImageName(lower)) {
+      throw new BadRequestException('Ключ должен указывать на модель или текстуру из каталога');
+    }
+    const slot = THEATER_KIT_SLOTS.find((item) => item.key.toLowerCase() === lower);
+    if (!slot || slot.group !== 'textures') {
+      throw new BadRequestException('Текстура должна совпадать со слотом каталога');
     }
     return normalized;
   }
@@ -133,7 +176,7 @@ export class AdminTheaterAssetsController {
     @UploadedFile() file: UploadedBin,
     @Query('key') keyParam?: string,
   ) {
-    this.assertGlbFile(file);
+    this.assertKitFile(file);
     const fromName = theaterKitSlotByFileName(file.originalname);
     const rawKey = keyParam?.trim() || fromName?.key;
     if (!rawKey) {
@@ -163,7 +206,7 @@ export class AdminTheaterAssetsController {
     const errors: Array<{ name: string; message: string }> = [];
     for (const file of files) {
       try {
-        this.assertGlbFile(file);
+        this.assertKitFile(file);
         const slot = theaterKitSlotByFileName(file.originalname);
         if (!slot) {
           throw new BadRequestException(

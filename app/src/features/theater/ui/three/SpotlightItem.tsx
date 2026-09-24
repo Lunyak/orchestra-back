@@ -13,6 +13,7 @@ import {
   THEATER_SPOTLIGHT_DEFAULT_UI_INTENSITY,
   THEATER_SPOTLIGHT_DECAY,
   THEATER_SPOTLIGHT_PENUMBRA,
+  THEATER_SPOTLIGHT_SHADOW_MAP_SIZE,
 } from "../../model/theater-scene-lighting";
 import { StageSpotlightModel } from "./StageSpotlightModel";
 import { SpotlightSmokeBeam } from "./SpotlightSmokeBeam";
@@ -35,6 +36,7 @@ export const SpotlightItem = ({
   showGuideLine = true,
   smokeBeamVisible = false,
   smokeSaturation = 1,
+  castShadow = false,
   onTargetChange,
   onPositionChange,
   onDraggingChange,
@@ -48,7 +50,7 @@ export const SpotlightItem = ({
   isActive: boolean;
   isSelected?: boolean;
   isPulsing?: boolean;
-  dragMode: "target" | "source";
+  dragMode: "target" | "source" | null;
   snapEnabled: boolean;
   snapStep: number;
   hallWidth: number;
@@ -62,6 +64,7 @@ export const SpotlightItem = ({
   showGuideLine?: boolean;
   smokeBeamVisible?: boolean;
   smokeSaturation?: number;
+  castShadow?: boolean;
   onTargetChange: (id: number, next: [number, number, number]) => void;
   onPositionChange: (id: number, next: [number, number, number]) => void;
   onDraggingChange: (value: boolean) => void;
@@ -177,7 +180,16 @@ export const SpotlightItem = ({
     fixtureRef.current.lookAt(end);
   }, [displayPosition, displayTarget]);
 
+  useEffect(() => {
+    if (isEnabled) return;
+    const pickScale = isHighlighted ? (isActive ? 1.45 : 1.28) : 1;
+    sourceRef.current?.scale.setScalar(pickScale);
+    fixtureRef.current?.scale.setScalar(isHighlighted ? 1.08 : 1);
+    labelRef.current?.scale.setScalar(1);
+  }, [isActive, isEnabled, isHighlighted]);
+
   useFrame((_, delta) => {
+    if (!isEnabled) return;
     const spot = spotRef.current;
     if (spot) {
       if (!spot.target.parent && spot.parent) {
@@ -229,6 +241,10 @@ export const SpotlightItem = ({
           distance={beamDistance}
           decay={THEATER_SPOTLIGHT_DECAY}
           color={config.color || tc("--color-warning")}
+          castShadow={castShadow}
+          shadow-mapSize-width={THEATER_SPOTLIGHT_SHADOW_MAP_SIZE}
+          shadow-mapSize-height={THEATER_SPOTLIGHT_SHADOW_MAP_SIZE}
+          shadow-bias={-0.0004}
         />
       )}
       {smokeBeamVisible && isEnabled ? (

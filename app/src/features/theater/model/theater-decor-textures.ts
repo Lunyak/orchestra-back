@@ -7,6 +7,8 @@ import {
 export type DecorTexturePresetId =
   | "velvet"
   | "velour-velvet"
+  | "jogging-melange"
+  | "moldy-wallpaper"
   | "canvas-beige"
   | "wood-oak"
   | "concrete-gray";
@@ -88,6 +90,8 @@ export type DecorTexturePreset = {
 export const DECOR_TEXTURE_PRESETS: DecorTexturePreset[] = [
   { id: "velvet", label: "Бархат" },
   { id: "velour-velvet", label: "Велюр" },
+  { id: "jogging-melange", label: "Меланж" },
+  { id: "moldy-wallpaper", label: "Плесневелые обои" },
   { id: "canvas-beige", label: "Холст" },
   { id: "wood-oak", label: "Дерево" },
   { id: "concrete-gray", label: "Бетон" },
@@ -95,6 +99,8 @@ export const DECOR_TEXTURE_PRESETS: DecorTexturePreset[] = [
 
 const DECOR_TEXTURE_PRESET_IMAGES: Partial<Record<DecorTexturePresetId, string>> = {
   "velour-velvet": "theater/textures/velour-velvet.jpg",
+  "jogging-melange": "theater/textures/jogging-melange.jpg",
+  "moldy-wallpaper": "theater/textures/moldy-wallpaper.jpg",
 };
 
 export function getDecorPresetImagePath(id: DecorTexturePresetId): string | null {
@@ -110,6 +116,8 @@ export function getDecorTexturePresetId(
   if (!value?.startsWith(DECOR_TEXTURE_PRESET_PREFIX)) return null;
   const raw = value.slice(DECOR_TEXTURE_PRESET_PREFIX.length);
   if (raw === "velour-velvet") return "velour-velvet";
+  if (raw === "jogging-melange") return "jogging-melange";
+  if (raw === "moldy-wallpaper") return "moldy-wallpaper";
   if (raw === "velvet" || LEGACY_VELVET_PRESET_IDS.has(raw)) return "velvet";
   if (raw === "canvas-beige" || raw === "wood-oak" || raw === "concrete-gray") {
     return raw;
@@ -243,8 +251,10 @@ export function createDecorPresetCanvas(presetId: DecorTexturePresetId): HTMLCan
   const ctx = canvas.getContext("2d");
   if (!ctx) return canvas;
 
-  if (presetId === "velour-velvet") {
-    ctx.fillStyle = "#5c1824";
+  if (presetId === "velour-velvet" || presetId === "jogging-melange" || presetId === "moldy-wallpaper") {
+    const fallback =
+      presetId === "jogging-melange" ? "#8a8d90" : presetId === "moldy-wallpaper" ? "#b7a48a" : "#5c1824";
+    ctx.fillStyle = fallback;
     ctx.fillRect(0, 0, size, size);
   } else if (presetId.startsWith("velvet")) {
     drawVelvet(ctx, size);

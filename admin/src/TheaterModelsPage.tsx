@@ -13,6 +13,7 @@ const GROUP_LABEL: Record<TheaterKitGroup, string> = {
   doors: "Двери",
   humans: "Люди",
   library: "Библиотека",
+  textures: "Текстуры",
 };
 
 const GROUP_ORDER: TheaterKitGroup[] = [
@@ -21,9 +22,11 @@ const GROUP_ORDER: TheaterKitGroup[] = [
   "doors",
   "humans",
   "library",
+  "textures",
 ];
 
-const MODEL_EXT = /\.(glb|gltf)$/i;
+const KIT_EXT = /\.(glb|gltf|jpe?g|png|webp)$/i;
+const KIT_ACCEPT = ".glb,.gltf,.jpg,.jpeg,.png,.webp";
 const UPLOAD_CHUNK = 6;
 
 type FsEntry = {
@@ -49,12 +52,16 @@ function errorText(err: unknown): string {
   return err instanceof Error ? err.message : "Ошибка";
 }
 
-function isModelFile(file: File) {
-  return MODEL_EXT.test(file.name);
+function isKitFile(file: File) {
+  return KIT_EXT.test(file.name);
+}
+
+function acceptForSlot(key: string) {
+  return /\.(jpe?g|png|webp)$/i.test(key) ? ".jpg,.jpeg,.png,.webp" : ".glb,.gltf";
 }
 
 function filesFromList(list: FileList | File[] | null): File[] {
-  return Array.from(list ?? []).filter(isModelFile);
+  return Array.from(list ?? []).filter(isKitFile);
 }
 
 function readDirectoryEntries(reader: ReturnType<FsEntry["createReader"]>) {
@@ -79,7 +86,7 @@ async function filesFromEntry(entry: FsEntry): Promise<File[]> {
     const file = await new Promise<File>((resolve, reject) => {
       entry.file(resolve, reject);
     });
-    return isModelFile(file) ? [file] : [];
+    return isKitFile(file) ? [file] : [];
   }
   if (!entry.isDirectory) return [];
   const children = await readDirectoryEntries(entry.createReader());
@@ -153,7 +160,7 @@ export function TheaterModelsPage() {
   const uploadFiles = async (files: File[], key?: string) => {
     const list = files.filter(Boolean);
     if (list.length === 0) {
-      setError("Нет .glb/.gltf в выбранных файлах");
+      setError("Нет файлов слотов в выбранных файлах");
       return;
     }
     setError("");
@@ -207,7 +214,7 @@ export function TheaterModelsPage() {
       <p className="admin-theater-lead">
         Залей папку целиком: локально это{" "}
         <code>web/public/theater</code>. Имена файлов должны совпадать со
-        слотами (<code>stage-spotlight.glb</code> и т.д.). Сборка web должна
+        слотами (<code>stage-spotlight.glb</code>, <code>velour-velvet.jpg</code>). Сборка web должна
         смотреть на бакет через <code>VITE_THEATER_ASSETS_BASE_URL</code>.
       </p>
       <p className="admin-theater-status">
@@ -227,14 +234,14 @@ export function TheaterModelsPage() {
         <span>
           {busy
             ? `Загрузка ${progress}…`
-            : "Перетащи папку theater или сразу все .glb"}
+            : "Перетащи папку theater или файлы слотов"}
         </span>
         <div className="admin-theater-drop__actions">
           <label className="admin-theater-file">
             Выбрать файлы
             <input
               type="file"
-              accept=".glb,.gltf"
+              accept={KIT_ACCEPT}
               multiple
               disabled={busy}
               onChange={(event) => {
@@ -311,7 +318,7 @@ export function TheaterModelsPage() {
                         {busyKey === slot.key ? "…" : "Заменить"}
                         <input
                           type="file"
-                          accept=".glb,.gltf"
+                          accept={acceptForSlot(slot.key)}
                           disabled={busy}
                           onChange={(event) => {
                             const file = event.target.files?.[0];

@@ -102,18 +102,6 @@ export function buildAudienceContextMenuItems(
           },
         },
         {
-          id: "audience-seat-spacing",
-          label: labelM("Шаг мест"),
-          disabled: true,
-          range: {
-            min: 0.45,
-            max: 0.55,
-            step: 0.01,
-            value: layout.seatSpacing,
-            formatValue: formatMeters,
-          },
-        },
-        {
           id: "audience-rows",
           label: "Ряды",
           range: {

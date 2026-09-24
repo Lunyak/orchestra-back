@@ -479,6 +479,8 @@ type SiteEvent = {
   anonse?: string;
   date?: string;
   cardImage: string;
+  sideImage?: string;
+  listImage?: string;
   eventPageBg?: string;
   disableGlass?: boolean;
   type?: string;
@@ -647,6 +649,16 @@ function SiteContentPage() {
   );
 }
 
+function colorToHex(value?: number) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "#050505";
+  return `#${(value & 0xffffff).toString(16).padStart(6, "0")}`;
+}
+
+function hexToColor(hex: string) {
+  const parsed = Number.parseInt(hex.replace("#", ""), 16);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 function SiteEventsCrudPage() {
   const url = "/minio/orchestra-media/site/content/events.json";
   const [content, setContent] = useState<SiteEventsContent>({ events: [] });
@@ -656,6 +668,8 @@ function SiteEventsCrudPage() {
   const [ok, setOk] = useState("");
   const [loadedMeta, setLoadedMeta] = useState<{ version: number | null; updatedAt: string | null } | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [sideFile, setSideFile] = useState<File | null>(null);
+  const [listFile, setListFile] = useState<File | null>(null);
   const [bgFile, setBgFile] = useState<File | null>(null);
   const [photosFiles, setPhotosFiles] = useState<File[]>([]);
   const [reviewImagesFiles, setReviewImagesFiles] = useState<File[]>([]);
@@ -741,15 +755,23 @@ function SiteEventsCrudPage() {
     return "mp3";
   };
 
-  const uploadAndSetField = async (file: File, kind: "cover" | "bg") => {
+  const uploadAndSetField = async (file: File, kind: "cover" | "bg" | "side" | "list") => {
     if (!selected) throw new Error("Не выбран спектакль");
     const slugSeg = normalizePathSegment(selected.slug);
     const ext = extFromName(file.name);
     const path =
-      kind === "cover" ? `covers/${slugSeg}.${ext}` : `bg/${slugSeg}.${ext}`;
+      kind === "cover"
+        ? `covers/${slugSeg}.${ext}`
+        : kind === "side"
+          ? `sides/${slugSeg}.${ext}`
+          : kind === "list"
+            ? `lists/${slugSeg}.${ext}`
+            : `bg/${slugSeg}.${ext}`;
     const out = await uploadSiteMedia({ file, path, prefix: "site" });
     const ref = `/${path}`;
     if (kind === "cover") updateSelected({ cardImage: ref });
+    else if (kind === "side") updateSelected({ sideImage: ref });
+    else if (kind === "list") updateSelected({ listImage: ref });
     else updateSelected({ eventPageBg: ref });
     setOk(`Загружено: ${out.url}`);
   };
@@ -1133,6 +1155,99 @@ function SiteEventsCrudPage() {
                   </button>
                 </div>
               </div>
+
+              <label style={{ display: "grid", gap: 6 }}>
+                <span>Картинка по бокам афиши (sideImage)</span>
+                <input
+                  value={selected.sideImage ?? ""}
+                  onChange={(e) => updateSelected({ sideImage: e.target.value })}
+                  placeholder="/sides/..."
+                  spellCheck={false}
+                />
+              </label>
+
+              <div style={{ display: "grid", gap: 6 }}>
+                <span style={{ fontSize: 13, opacity: 0.9 }}>Загрузить картинку для боковых половинок</span>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setSideFile(e.target.files?.[0] ?? null)}
+                  />
+                  <button
+                    type="button"
+                    className="small"
+                    disabled={loading || !sideFile}
+                    onClick={async () => {
+                      if (!sideFile) return;
+                      setLoading(true);
+                      setError("");
+                      setOk("");
+                      try {
+                        await uploadAndSetField(sideFile, "side");
+                        setSideFile(null);
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : "Ошибка загрузки");
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                  >
+                    Загрузить боковую картинку
+                  </button>
+                </div>
+              </div>
+
+              <label style={{ display: "grid", gap: 6 }}>
+                <span>Афиша в мобильном списке (listImage)</span>
+                <input
+                  value={selected.listImage ?? ""}
+                  onChange={(e) => updateSelected({ listImage: e.target.value })}
+                  placeholder="/lists/..."
+                  spellCheck={false}
+                />
+              </label>
+
+              <div style={{ display: "grid", gap: 6 }}>
+                <span style={{ fontSize: 13, opacity: 0.9 }}>Загрузить отдельную картинку для мобильной афиши</span>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setListFile(e.target.files?.[0] ?? null)}
+                  />
+                  <button
+                    type="button"
+                    className="small"
+                    disabled={loading || !listFile}
+                    onClick={async () => {
+                      if (!listFile) return;
+                      setLoading(true);
+                      setError("");
+                      setOk("");
+                      try {
+                        await uploadAndSetField(listFile, "list");
+                        setListFile(null);
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : "Ошибка загрузки");
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                  >
+                    Загрузить афишу списка
+                  </button>
+                </div>
+              </div>
+
+              <label style={{ display: "grid", gap: 6 }}>
+                <span>Цвет фона по бокам</span>
+                <input
+                  type="color"
+                  value={colorToHex(selected.colorBackground)}
+                  onChange={(e) => updateSelected({ colorBackground: hexToColor(e.target.value) })}
+                />
+              </label>
 
               <label style={{ display: "grid", gap: 6 }}>
                 <span>Фон страницы спектакля (eventPageBg)</span>

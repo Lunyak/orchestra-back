@@ -32,6 +32,7 @@ export type TheaterFloorPlanProps = {
     clientX?: number,
     clientY?: number,
   ) => void;
+  onSpotlightContextMenu?: (id: number, clientX: number, clientY: number) => void;
   onSelectDoor?: (id: number) => void;
   onSelectRecess?: (id: number) => void;
   onSelectOpening?: (id: number) => void;

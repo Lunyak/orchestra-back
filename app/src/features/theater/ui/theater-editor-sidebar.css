@@ -70,6 +70,35 @@
   white-space: nowrap;
 }
 
+.theater-sidebar-models-btn {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin: 0;
+  margin-top: auto;
+  padding: 10px 12px;
+  border: 0;
+  border-top: 1px solid #222;
+  background: #111;
+  color: #aaa;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.theater-sidebar-models-btn:hover,
+.theater-sidebar-models-btn--open {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-active-ascent);
+}
+
+.theater-sidebar-models-btn:hover .theater-sidebar-home__icon,
+.theater-sidebar-models-btn--open .theater-sidebar-home__icon {
+  color: var(--color-active-ascent);
+}
+
 .theater-sidebar-home__meta {
   flex: 0 0 auto;
   margin-left: auto;
@@ -108,7 +137,9 @@
   cursor: pointer;
 }
 
-.theater-sidebar-panel-header__back:hover {
+.theater-sidebar-panel-header__back:hover,
+.theater-sidebar-panel-header__back--open,
+.theater-sidebar-panel-header__back[aria-expanded="true"] {
   color: var(--color-active-ascent);
   background: rgba(255, 255, 255, 0.04);
 }
@@ -120,14 +151,24 @@
 
 .theater-sidebar-panel-header__title {
   min-width: 0;
+  margin: 0;
+  padding: 0 8px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  border: 0;
+  background: transparent;
   color: var(--color-active-ascent);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
+  text-align: left;
+  text-overflow: ellipsis;
   text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.theater-sidebar-panel-header__title:hover {
+  color: var(--color-active-ascent);
 }
 
 .theater-keyboard-hints--editor {
@@ -365,10 +406,23 @@
   overflow-y: auto;
 }
 
+.theater-spotlight-nav-toolbar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 8px;
+  border-bottom: 1px solid #222;
+}
+
 .theater-spotlight-nav-toolbar .theater-btn.button {
   min-width: 22px;
   min-height: 22px;
   padding: 0 6px;
+  text-transform: none;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 .theater-spotlight-nav-toolbar .theater-btn--visibility.button,
@@ -379,12 +433,31 @@
   min-width: 22px;
   min-height: 22px;
   padding: 0;
-  border: 1px solid #333;
-  background: rgba(0, 0, 0, 0.22);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
-.theater-spotlight-nav-toolbar .theater-btn--visibility.button--active .theater-spotlight-power-dot,
-.theater-spotlight-nav-toolbar .theater-btn--visibility.button:not(.secondary) .theater-spotlight-power-dot,
+.theater-spotlight-nav-toolbar .theater-btn--all.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  margin-left: auto;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: #888;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.theater-spotlight-nav-toolbar .theater-btn--all.button:hover:not(:disabled) {
+  background: transparent;
+  color: #ccc;
+}
+
+.theater-spotlight-nav-toolbar .theater-btn--visibility-on .theater-spotlight-power-dot,
 .theater-spotlight-nav-row .theater-btn--visibility.button--active .theater-spotlight-power-dot,
 .theater-spotlight-nav-row .theater-btn--visibility.button:not(.secondary) .theater-spotlight-power-dot {
   background: var(--color-active-ascent);
@@ -393,10 +466,18 @@
 .theater-spotlight-nav-list {
   flex: 1 1 auto;
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .theater-spotlight-nav-row {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px 8px 4px 10px;
   cursor: pointer;
 }
 
@@ -442,8 +523,10 @@
 }
 
 .theater-spotlight-nav-row .theater-spotlight-channel--compact {
-  flex: 0 0 42px;
-  min-width: 42px;
+  flex: 0 0 44px;
+  width: 44px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .theater-spotlight-nav-row .theater-channel-input.native-select {
@@ -451,18 +534,20 @@
   min-width: 0;
   height: 22px;
   min-height: 22px;
-  padding: 0 2px;
+  padding: 0;
   border: 1px solid transparent;
-  background: transparent;
+  background-color: transparent;
+  background-image: none;
   color: #888;
   font-size: 11px;
 }
 
 .theater-spotlight-nav-row .theater-btn.button {
-  flex: 0 0 22px;
-  width: 22px;
-  min-width: 22px;
-  min-height: 22px;
+  box-sizing: border-box;
+  flex: 0 0 18px;
+  width: 18px;
+  min-width: 18px;
+  min-height: 18px;
   padding: 0;
 }
 

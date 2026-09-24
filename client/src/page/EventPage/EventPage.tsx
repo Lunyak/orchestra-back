@@ -1,10 +1,11 @@
 /* eslint-disable no-useless-escape */
 import { CSSProperties, FC, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useParams } from "react-router-dom";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
-import { Controller, Navigation, Pagination } from "swiper/modules";
+import { Navigation, Pagination } from "swiper/modules";
 import { Swiper, SwiperClass, SwiperSlide } from "swiper/react";
 import { ChalkPageShell } from "../../shared/component/ChalkPageShell/ChalkPageShell";
 import { ImageWithPreloader } from "../../shared/component/ImageWithPreloader/ImageWithPreloader";
@@ -155,6 +156,22 @@ const EventPage: FC = () => {
   }, [eventSlug]);
 
   const curentEvent = events.find((E) => E.slug === eventSlug);
+  const isZaklyatie = (eventSlug ?? "").trim().toLowerCase() === "заклятие";
+  const [atmosphereRoot, setAtmosphereRoot] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const page = document.querySelector(".chalk-page");
+    if (!(page instanceof HTMLElement) || !curentEvent) return;
+    if (isZaklyatie) setAtmosphereRoot(page);
+    const tint = eventTint(curentEvent.colorBackground);
+    const picture = isZaklyatie ? "" : curentEvent.eventPageBg?.trim();
+    if (tint) page.style.setProperty("--afisha-page-bg", tint);
+    if (picture) page.style.setProperty("--event-page-bg", `url("${siteAsset(picture)}")`);
+    return () => {
+      page.style.removeProperty("--afisha-page-bg");
+      page.style.removeProperty("--event-page-bg");
+    };
+  }, [curentEvent, isZaklyatie]);
 
   if (!curentEvent) {
     return (
@@ -162,6 +179,7 @@ const EventPage: FC = () => {
         mainClassName="chalk-page__main--event"
         scrollable
         showHomeBack
+        showSectionNav={false}
         homeBackTo={eventsPath}
         homeBackLabel="На афишу"
       >
@@ -298,20 +316,25 @@ const EventPage: FC = () => {
   };
 
   const photos = (curentEvent.photos ?? []).map(siteAsset);
-  const hasMetaChips =
-    curentEvent.soon ||
-    Boolean(curentEvent.old?.trim()) ||
-    Boolean(curentEvent.type?.trim()) ||
-    Boolean(curentEvent.date?.trim());
+  const ageLabel = curentEvent.old?.trim() || "";
+  const hasMetaChips = curentEvent.soon || Boolean(curentEvent.type?.trim());
 
   return (
     <ChalkPageShell
       mainClassName="chalk-page__main--event"
       scrollable
       showHomeBack
+      showSectionNav={false}
       homeBackTo={eventsPath}
       homeBackLabel="На афишу"
     >
+      {isZaklyatie &&
+        atmosphereRoot &&
+        createPortal(
+          <ZaklyatieAtmosphere fallbackSrc={photos[0]} />,
+          atmosphereRoot,
+        )}
+
       {showRainToggle && (
         <div className="chalk-event__rain">
           <RainAmbienceToggle url={rainAudioUrl} label={rainButtonLabel} />
@@ -329,19 +352,16 @@ const EventPage: FC = () => {
       {hasMetaChips && (
         <div className="chalk-event__chips" aria-label="Характеристики спектакля">
           {curentEvent.soon && <span className="chalk-event__chip">скоро</span>}
-          {curentEvent.old?.trim() && (
-            <span className="chalk-event__chip">{curentEvent.old.trim()}</span>
-          )}
           {curentEvent.type?.trim() && (
             <span className="chalk-event__chip">{curentEvent.type.trim()}</span>
-          )}
-          {curentEvent.date?.trim() && (
-            <span className="chalk-event__chip">{curentEvent.date.trim()}</span>
           )}
         </div>
       )}
 
-      <h1 className="chalk-page__title chalk-event__title">{title}</h1>
+      <div className="chalk-event__heading">
+        <h1 className="chalk-page__title chalk-event__title">{title}</h1>
+        {ageLabel && <span className="chalk-event__chip chalk-event__age">{ageLabel}</span>}
+      </div>
       {curentEvent.subtitle?.trim() && (
         <p className="chalk-page__subtitle">{curentEvent.subtitle.trim()}</p>
       )}
@@ -350,6 +370,22 @@ const EventPage: FC = () => {
       {photos.length > 0 && (
         <section className="chalk-event__photo" aria-label="Фотографии спектакля">
           <PhotoCarousel images={photos} title={title} />
+          {hasTicketsCloud && (
+            <div className="chalk-event__tickets-side">
+              {ticketsCloudEventId && ticketsCloudToken ? (
+                <button
+                  type="button"
+                  className="chalk-event__tickets-btn"
+                  data-tc-event={ticketsCloudEventId}
+                  data-tc-token={ticketsCloudToken}
+                >
+                  Купить билет
+                </button>
+              ) : (
+                <span className="chalk-event__row-meta">скоро в продаже</span>
+              )}
+            </div>
+          )}
         </section>
       )}
 
@@ -361,7 +397,7 @@ const EventPage: FC = () => {
 
       <div className="chalk-event__list" role="list" aria-label="Действия">
         {hasTicketsCloud && (
-          <div className="chalk-event__row" role="listitem">
+          <div className="chalk-event__row chalk-event__row--tickets" role="listitem">
             <span className="chalk-event__row-title">Билеты</span>
             {ticketsCloudEventId && ticketsCloudToken ? (
               <button
@@ -385,8 +421,8 @@ const EventPage: FC = () => {
           rel="noopener noreferrer"
           role="listitem"
         >
-          <span className="chalk-event__row-title">Как нас найти</span>
-          <span className="chalk-event__row-meta">видео</span>
+          <span className="chalk-event__row-title chalk-event__find">Как нас найти</span>
+          <span className="chalk-event__row-meta chalk-event__video">видео</span>
         </a>
       </div>
 
@@ -439,11 +475,37 @@ const EventPage: FC = () => {
           .
         </p>
       )}
+      {curentEvent.sideImage?.trim() && (
+        <EventSideSplit src={siteAsset(curentEvent.sideImage.trim())} title={title} />
+      )}
     </ChalkPageShell>
   );
 };
 
 export const Component = EventPage;
+
+function eventTint(value?: number) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "";
+  const color = value & 0xffffff;
+  const red = (color >> 16) & 255;
+  const green = (color >> 8) & 255;
+  const blue = color & 255;
+  return `rgba(${red}, ${green}, ${blue}, 0.2)`;
+}
+
+function EventSideSplit({ src, title }: { src: string; title: string }) {
+  return createPortal(
+    <div className="chalk-afisha-board chalk-afisha-board--page">
+      <div className="chalk-afisha-board__poster chalk-afisha-board__poster--left">
+        <img className="chalk-afisha-board__img" src={src} alt="" />
+      </div>
+      <div className="chalk-afisha-board__poster chalk-afisha-board__poster--right">
+        <img className="chalk-afisha-board__img" src={src} alt={title} />
+      </div>
+    </div>,
+    document.body
+  );
+}
 
 interface PhotoCarouselProps {
   images: string[];
@@ -533,19 +595,41 @@ function ReviewImagesSlider({ images }: { images: string[] }) {
 
 function PhotoCarousel({ images, title }: PhotoCarouselProps) {
   const [mainSwiper, setMainSwiper] = useState<SwiperClass | null>(null);
-  const [thumbSwiper, setThumbSwiper] = useState<SwiperClass | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    if (!mainSwiper || mainSwiper.destroyed) return;
+    const refresh = () => {
+      if (mainSwiper.destroyed) return;
+      mainSwiper.update();
+      mainSwiper.slideToLoop(mainSwiper.realIndex, 0, false);
+    };
+    const frame = requestAnimationFrame(refresh);
+    const timer = window.setTimeout(refresh, 60);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
+  }, [mainSwiper, images.length]);
 
   return (
     <div className="event-carousel">
       {/* Основной слайдер */}
       <Swiper
-        modules={[Controller]}
+        modules={[Navigation]}
+        navigation
+        centeredSlides
+        slideToClickedSlide
         onSwiper={setMainSwiper}
-        controller={{ control: thumbSwiper }}
-        spaceBetween={10}
+        spaceBetween={12}
         slidesPerView={1}
-        loop={true}
+        loop
+        loopAdditionalSlides={4}
+        observer
+        observeParents
+        breakpoints={{
+          900: { slidesPerView: 2.15, spaceBetween: 14, centeredSlides: true },
+        }}
         onSlideChange={(swiper: SwiperClass) =>
           setActiveIndex(swiper.realIndex)
         }
@@ -577,18 +661,20 @@ function PhotoCarousel({ images, title }: PhotoCarouselProps) {
 
       {/* Миниатюрный слайдер */}
       <Swiper
-        modules={[Navigation, Controller]}
-        onSwiper={setThumbSwiper}
-        controller={{ control: mainSwiper }} // <- теперь нижний управляет верхним
+        modules={[Navigation]}
         spaceBetween={10}
         slidesPerView={4}
         navigation
-        // loop={true}
-        slideToClickedSlide={true} // клики по миниатюрам меняют большой слайд
+        slideToClickedSlide
+        onSlideChange={(swiper: SwiperClass) => mainSwiper?.slideToLoop(swiper.realIndex)}
         className="event-carousel__thumbs"
       >
         {images.map((src, index) => (
-          <SwiperSlide key={index} className="event-carousel__thumbSlide">
+          <SwiperSlide
+            key={index}
+            className="event-carousel__thumbSlide"
+            onClick={() => mainSwiper?.slideToLoop(index)}
+          >
             <ImageWithPreloader
               className="event-carousel__thumbWrap"
               imgClassName={
@@ -610,6 +696,144 @@ function PhotoCarousel({ images, title }: PhotoCarouselProps) {
 }
 
 export default PhotoCarousel;
+
+type RainDrop = {
+  x: number;
+  y: number;
+  r: number;
+  vx: number;
+  vy: number;
+  trail: number;
+  wobble: number;
+};
+
+function ZaklyatieAtmosphere({ fallbackSrc }: { fallbackSrc?: string }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const lastTRef = useRef(0);
+  const dropsRef = useRef<RainDrop[]>([]);
+  const [bgSrc, setBgSrc] = useState(
+    "https://i.pinimg.com/1200x/f1/35/9b/f1359b0d0d57d5b89e1134113ebe8fd1.jpg",
+  );
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+
+    const prefersReduced =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const createDrop = (w: number, h: number): RainDrop => {
+      const r = 1.6 + Math.random() * 4.8;
+      return {
+        x: Math.random() * w,
+        y: Math.random() * h,
+        r,
+        vx: (-0.2 + Math.random() * 0.4) * 30,
+        vy: (0.6 + Math.random() * 1.8) * (70 + r * 22),
+        trail: 18 + Math.random() * 70,
+        wobble: Math.random() * Math.PI * 2,
+      };
+    };
+
+    const setSize = () => {
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      const w = Math.floor(window.innerWidth * dpr);
+      const h = Math.floor(window.innerHeight * dpr);
+      canvas.width = w;
+      canvas.height = h;
+
+      const area = (w * h) / (dpr * dpr);
+      const count = Math.max(70, Math.min(260, Math.floor(area / 9000)));
+      dropsRef.current = Array.from({ length: count }, () => createDrop(w, h));
+    };
+
+    const draw = (t: number) => {
+      const w = canvas.width;
+      const h = canvas.height;
+      const dt = Math.min(0.033, lastTRef.current ? (t - lastTRef.current) / 1000 : 0.016);
+      lastTRef.current = t;
+
+      ctx.clearRect(0, 0, w, h);
+      ctx.globalCompositeOperation = "lighter";
+
+      const drops = dropsRef.current;
+      for (let i = 0; i < drops.length; i++) {
+        const d = drops[i];
+        d.wobble += dt * (0.8 + d.r * 0.2);
+        const wind = Math.sin(d.wobble) * 10;
+        d.x += (d.vx + wind) * dt;
+        d.y += d.vy * dt;
+
+        if (d.y - d.trail > h + 30) {
+          d.y = -20 - Math.random() * 120;
+          d.x = Math.random() * w;
+          d.r = 1.6 + Math.random() * 4.8;
+          d.vx = (-0.2 + Math.random() * 0.4) * 30;
+          d.vy = (0.6 + Math.random() * 1.8) * (70 + d.r * 22);
+          d.trail = 18 + Math.random() * 70;
+          d.wobble = Math.random() * Math.PI * 2;
+        }
+        if (d.x < -40) d.x = w + 40;
+        if (d.x > w + 40) d.x = -40;
+
+        const trailLen = d.trail * (0.75 + d.r * 0.06);
+        const trail = ctx.createLinearGradient(d.x, d.y - trailLen, d.x, d.y);
+        trail.addColorStop(0, "rgba(255,255,255,0)");
+        trail.addColorStop(0.6, "rgba(255,255,255,0.08)");
+        trail.addColorStop(1, "rgba(255,255,255,0.18)");
+        ctx.strokeStyle = trail;
+        ctx.lineWidth = Math.max(0.8, d.r * 0.55);
+        ctx.beginPath();
+        ctx.moveTo(d.x, d.y - trailLen);
+        ctx.lineTo(d.x, d.y + d.r * 1.5);
+        ctx.stroke();
+
+        const headRadius = d.r * 2.1;
+        const head = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, headRadius);
+        head.addColorStop(0, "rgba(255,255,255,0.36)");
+        head.addColorStop(0.35, "rgba(255,255,255,0.16)");
+        head.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = head;
+        ctx.beginPath();
+        ctx.ellipse(d.x, d.y, headRadius * 0.62, headRadius, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      rafRef.current = window.requestAnimationFrame(draw);
+    };
+
+    setSize();
+    window.addEventListener("resize", setSize);
+
+    if (!prefersReduced) {
+      rafRef.current = window.requestAnimationFrame(draw);
+    }
+
+    return () => {
+      window.removeEventListener("resize", setSize);
+      if (rafRef.current) window.cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    };
+  }, []);
+
+  return (
+    <div className="zaklyatie-atmosphere" aria-hidden="true">
+      <img
+        className="zaklyatie-atmosphere__bg"
+        src={bgSrc}
+        alt=""
+        onError={() => {
+          if (fallbackSrc && bgSrc !== fallbackSrc) setBgSrc(fallbackSrc);
+        }}
+      />
+      <canvas ref={canvasRef} className="zaklyatie-atmosphere__canvas" />
+      <div className="zaklyatie-atmosphere__glass" />
+    </div>
+  );
+}
 
 function RainAmbienceToggle({ url, label }: { url: string; label: string }) {
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -739,12 +963,9 @@ function RainAmbienceToggle({ url, label }: { url: string; label: string }) {
   return (
     <button
       type="button"
-      className={
-        isOn
-          ? "chalk-event__chip chalk-event__rain-toggle is-on"
-          : "chalk-event__chip chalk-event__rain-toggle"
-      }
+      className={isOn ? "chalk-event__rain-toggle is-on" : "chalk-event__rain-toggle"}
       aria-pressed={isOn}
+      aria-label={isOn ? `${label}: выключить` : `${label}: включить`}
       disabled={isLoading}
       aria-busy={isLoading}
       onClick={async () => {
@@ -772,7 +993,13 @@ function RainAmbienceToggle({ url, label }: { url: string; label: string }) {
         }
       }}
     >
-      {label}: {isLoading ? "…" : isOn ? "вкл" : "выкл"}
+      <svg className="chalk-event__rain-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M9 18.5a2.5 2.5 0 1 1-1.8-2.4V6.2L19 4v9.3a2.5 2.5 0 1 1-1.8-2.4V7.2L9 8.8v9.7z"
+          fill="currentColor"
+        />
+        {!isOn && <path className="chalk-event__rain-slash" d="M4 20 L20 4" />}
+      </svg>
     </button>
   );
 }

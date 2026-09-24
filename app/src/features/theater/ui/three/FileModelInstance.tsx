@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
 import type { TheaterModel } from "../../../../shared/types/script";
 import { dropStaleTheaterModelClones } from "./drop-stale-theater-model-clones";
+import { ModelSelectionFrame, selectionFrameFromObject } from "./ModelSelectionFrame";
 
 export const FileModelInstance = ({
   model,
@@ -36,6 +37,7 @@ export const FileModelInstance = ({
   const groupRef = useRef<THREE.Group | null>(null);
   const gltf = useGLTF(url);
   const scene = useMemo(() => SkeletonUtils.clone(gltf.scene), [gltf.scene]);
+  const selectionFrame = useMemo(() => selectionFrameFromObject(scene), [scene]);
   const { actions, names } = useAnimations(gltf.animations, scene);
 
   useEffect(() => {
@@ -115,13 +117,7 @@ export const FileModelInstance = ({
           data.originalEmissive = standard.emissive.clone();
         }
         const isRequisite = model.isRequisite === true;
-        if (isSelected) {
-          standard.color.set(tc("--color-error"));
-          if (standard.emissive) {
-            standard.emissive.set(tc("--color-danger-emissive"));
-            standard.emissiveIntensity = 0.4;
-          }
-        } else if (isHovered) {
+        if (isHovered && !isSelected) {
           standard.color.set(tc("--color-primary-light"));
           if (standard.emissive) {
             standard.emissive.set(tc("--color-primary-dark"));
@@ -182,7 +178,13 @@ export const FileModelInstance = ({
         onHoverChange?.(false);
       }}
     >
-      <primitive object={scene} />
+      <primitive object={scene}>
+        <ModelSelectionFrame
+          visible={isSelected === true}
+          size={selectionFrame.size}
+          center={selectionFrame.center}
+        />
+      </primitive>
     </group>
   );
 };

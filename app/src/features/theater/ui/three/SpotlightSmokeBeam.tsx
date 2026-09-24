@@ -110,7 +110,7 @@ export function SpotlightSmokeBeam({
       raycast={() => null}
       renderOrder={2}
     >
-      <cylinderGeometry args={[beam.radius, 0.03, beam.length, 36, 1, true]} />
+      <cylinderGeometry args={[beam.radius, 0.03, beam.length, 16, 1, true]} />
     </mesh>
   );
 }

@@ -42,8 +42,9 @@ desktop/release/
 /data/desktop-releases/*
 !/data/desktop-releases/.gitkeep
 
-# 3D-модели (тяжёлые, не нужны на сервере / в репо)
+# 3D-модели и текстуры театра (тяжёлые, на хост через админку)
 *.glb
+web/public/theater/textures/
 
 /BOT_CHECKLIST.md
 /BOT_MIGRATION_SUMMARY.md

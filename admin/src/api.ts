@@ -118,7 +118,8 @@ export type TheaterKitGroup =
   | "rig"
   | "doors"
   | "humans"
-  | "library";
+  | "library"
+  | "textures";
 
 export type TheaterAssetSlot = {
   id: string;

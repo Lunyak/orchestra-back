@@ -25,6 +25,7 @@ type ModelFloorMoveHandlesProps = {
   layout: TheaterLayout;
   snapEnabled: boolean;
   snapStep: number;
+  figureModels?: TheaterModel[];
   lockY?: boolean;
   onPreview: (position: [number, number, number]) => void;
   onCommit: (position: [number, number, number]) => void;
@@ -56,6 +57,73 @@ function fallbackAxisFootprint(model: TheaterModel): AxisFootprint {
     maxY: height,
     minZ: -depth / 2,
     maxZ: depth / 2,
+  };
+}
+
+function worldFootprintOfModel(model: TheaterModel): AxisFootprint {
+  const local = fallbackAxisFootprint(model);
+  const yaw = model.rotation[1];
+  const cos = Math.cos(yaw);
+  const sin = Math.sin(yaw);
+  const corners: Array<[number, number]> = [
+    [local.minX, local.minZ],
+    [local.maxX, local.minZ],
+    [local.minX, local.maxZ],
+    [local.maxX, local.maxZ],
+  ];
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  corners.forEach(([x, z]) => {
+    const worldX = model.position[0] + x * cos + z * sin;
+    const worldZ = model.position[2] - x * sin + z * cos;
+    minX = Math.min(minX, worldX);
+    maxX = Math.max(maxX, worldX);
+    minZ = Math.min(minZ, worldZ);
+    maxZ = Math.max(maxZ, worldZ);
+  });
+  return {
+    minX,
+    maxX,
+    minY: model.position[1] + local.minY,
+    maxY: model.position[1] + local.maxY,
+    minZ,
+    maxZ,
+  };
+}
+
+function figureFootprint(
+  anchor: TheaterModel,
+  members: TheaterModel[],
+): { footprint: AxisFootprint; centerY: number } | null {
+  if (members.length < 2) return null;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  members.forEach((member) => {
+    const box = worldFootprintOfModel(member);
+    minX = Math.min(minX, box.minX);
+    maxX = Math.max(maxX, box.maxX);
+    minY = Math.min(minY, box.minY);
+    maxY = Math.max(maxY, box.maxY);
+    minZ = Math.min(minZ, box.minZ);
+    maxZ = Math.max(maxZ, box.maxZ);
+  });
+  if (!Number.isFinite(minX) || !Number.isFinite(minZ)) return null;
+  return {
+    footprint: {
+      minX: minX - anchor.position[0],
+      maxX: maxX - anchor.position[0],
+      minY: 0,
+      maxY: maxY - minY,
+      minZ: minZ - anchor.position[2],
+      maxZ: maxZ - anchor.position[2],
+    },
+    centerY: Math.max(MIN_HANDLE_Y, (minY + maxY) / 2),
   };
 }
 
@@ -107,6 +175,7 @@ export function ModelFloorMoveHandles({
   layout,
   snapEnabled,
   snapStep,
+  figureModels = [],
   lockY = false,
   onPreview,
   onCommit,
@@ -127,12 +196,13 @@ export function ModelFloorMoveHandles({
   const pointerNdc = useMemo(() => new THREE.Vector2(), []);
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
 
-  const footprint = resolveAxisFootprint(model, object);
+  const figure = figureFootprint(model, figureModels);
+  const footprint = figure?.footprint ?? resolveAxisFootprint(model, object);
   const centerX = (footprint.minX + footprint.maxX) / 2;
   const centerZ = (footprint.minZ + footprint.maxZ) / 2;
   const spanX = Math.max(0.35, footprint.maxX - footprint.minX);
   const spanZ = Math.max(0.35, footprint.maxZ - footprint.minZ);
-  const handlesCenterY = resolveHandlesCenterY(model, object, footprint);
+  const handlesCenterY = figure?.centerY ?? resolveHandlesCenterY(model, object, footprint);
   const accent = tc("--color-active-ascent");
   const position = model.position;
 

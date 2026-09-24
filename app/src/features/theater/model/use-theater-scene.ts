@@ -37,6 +37,7 @@ import { DEFAULT_THEATER_LAYOUT } from "./theater-defaults";
 import type { ActiveAlignGuide } from "./theater-align-guides";
 import { buildLightPlotFromSpotlights } from "./theater-light-channel-link";
 import { syncMountedSpotlights } from "./theater-truss-mounts";
+import { getTheaterActiveKadrId } from "./theater-active-kadr";
 import {
   applyTheaterSmokeMachineToScene,
   readSceneSmokeMachineEnabled,
@@ -376,6 +377,7 @@ export function useTheaterScene({
 
   useEffect(() => {
     if (isDragging) return;
+    if (getTheaterActiveKadrId()) return;
     const syncedSpotlights = syncMountedSpotlights(spotlights, models);
     const hasChanges = syncedSpotlights.some(
       (spotlight, index) => spotlight !== spotlights[index],

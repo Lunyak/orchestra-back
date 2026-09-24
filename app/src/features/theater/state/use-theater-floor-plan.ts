@@ -6,6 +6,7 @@ import {
   downloadFloorPlanPng,
   downloadFloorPlanSvg,
 } from "../model/theater-floor-plan-export";
+import { printTheaterPackage } from "../model/theater-print-package";
 
 export type UseTheaterFloorPlanArgs = {
   projectName: string;
@@ -109,6 +110,34 @@ export function useTheaterFloorPlan({
     visibleSpotlights,
   ]);
 
+  const exportPrintPackage = useCallback(() => {
+    const opened = printTheaterPackage({
+      layout,
+      models: visibleModels,
+      spotlights: visibleSpotlights,
+      showSeats,
+      showSpotlights,
+      showGrid,
+      gridStep,
+      title: currentScene?.title ?? projectName,
+      projectName,
+    });
+    setDecorActionMessage(
+      opened ? "Открыт печатный пакет" : "Браузер заблокировал окно печати",
+    );
+  }, [
+    currentScene?.title,
+    gridStep,
+    layout,
+    projectName,
+    setDecorActionMessage,
+    showGrid,
+    showSeats,
+    showSpotlights,
+    visibleModels,
+    visibleSpotlights,
+  ]);
+
   const copyFloorPlanToClipboardFn = useCallback(async () => {
     const ok = await copyFloorPlanToClipboard({
       layout,
@@ -142,6 +171,7 @@ export function useTheaterFloorPlan({
     exportFloorPlanSvg,
     exportFloorPlanPng,
     exportFloorPlanPdf,
+    exportPrintPackage,
     copyFloorPlanToClipboard: copyFloorPlanToClipboardFn,
   };
 }

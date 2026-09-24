@@ -1728,6 +1728,65 @@ input.theater-builtin-template-filter.native-text-input[type="search"]:focus-vis
   grid-template-columns: repeat(3, 1fr);
 }
 
+.theater-btn-row--stack {
+  grid-template-columns: 1fr;
+}
+
+.theater-layout-panel--copy .theater-panel-section__toggle {
+  min-height: 2.25rem;
+  padding: 4px 2px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.theater-layout-panel--copy .theater-panel-section__body {
+  gap: 10px;
+  padding: 10px 2px 14px;
+}
+
+.theater-layout-panel--copy .theater-copy-lead {
+  margin: 0;
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.35;
+  color: var(--color-text-primary);
+}
+
+.theater-layout-panel.theater-layout-panel--copy .theater-layout-hint,
+.theater-layout-panel.theater-layout-panel--copy .labeled-checkbox__text {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--color-text-primary);
+}
+
+.theater-layout-panel.theater-layout-panel--copy .theater-layout-hint {
+  color: var(--color-text-muted-bright);
+}
+
+.theater-layout-panel--copy .theater-compact-checks {
+  gap: 8px;
+}
+
+.theater-layout-panel--copy .theater-btn-row .theater-btn.button {
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 13px;
+  white-space: normal;
+}
+
+.theater-layout-panel--copy .theater-btn.theater-btn--danger.button {
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.theater-layout-panel.theater-layout-panel--copy .theater-select.custom-select__trigger,
+.theater-layout-panel.theater-layout-panel--copy .theater-field .theater-label {
+  font-size: 13px;
+  min-height: 32px;
+}
+
 .theater-layout-title {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);

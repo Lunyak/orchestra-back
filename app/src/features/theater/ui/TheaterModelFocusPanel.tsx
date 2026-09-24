@@ -63,6 +63,7 @@ export type TheaterModelFocusPanelProps = {
   sizeAxisLabels?: Record<keyof TheaterModelWorldSize, string>;
   onSizeCommit?: (next: Partial<TheaterModelWorldSize>) => void;
   transformMode: TheaterModelTransformMode;
+  transformArmed?: boolean;
   showDecorActions: boolean;
   hidden?: boolean;
   onToggleHidden?: () => void;
@@ -85,6 +86,7 @@ export function TheaterModelFocusPanel({
   sizeAxisLabels,
   onSizeCommit,
   transformMode,
+  transformArmed = false,
   showDecorActions,
   hidden = false,
   onToggleHidden,
@@ -213,7 +215,8 @@ export function TheaterModelFocusPanel({
                 "theater-model-context-menu__item",
                 "theater-model-context-menu__item--compact",
                 "theater-model-focus-transform-btn",
-                transformMode === mode &&
+                transformArmed &&
+                  transformMode === mode &&
                   "theater-model-context-menu__item--active",
               )}
               onClick={() => onPickTransform(mode)}

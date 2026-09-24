@@ -111,16 +111,6 @@ export function TheaterControlsLayoutAudienceSection({ vm, layout }: LayoutSecti
           onChange={(rowSpacing) => vm.updateLayout({ rowSpacing })}
           {...historyTx}
         />
-        <TheaterRangeField
-          label={labelM("Шаг мест")}
-          min={0.45}
-          max={0.55}
-          step={0.01}
-          value={vm.layout.seatSpacing}
-          disabled
-          formatValue={(value) => String(roundM(value))}
-          onChange={() => undefined}
-        />
         {aisles.map((aisle, index) => {
           const labelIndex = aisles.length > 1 ? ` ${index + 1}` : "";
           const aisleHalf = aisle.width / 2;

@@ -30,6 +30,7 @@ export function TheaterFloorPlan(props: TheaterFloorPlanProps) {
     onSelectSpotlight,
     onSelectModel,
     onModelContextMenu,
+    onSpotlightContextMenu,
   } = props;
 
   const geometry = useTheaterFloorPlanGeometry(props);
@@ -96,6 +97,7 @@ export function TheaterFloorPlan(props: TheaterFloorPlanProps) {
           onSelectSpotlight={onSelectSpotlight}
           onSelectModel={onSelectModel}
           onModelContextMenu={onModelContextMenu}
+          onSpotlightContextMenu={onSpotlightContextMenu}
         />
         <button
           type="button"

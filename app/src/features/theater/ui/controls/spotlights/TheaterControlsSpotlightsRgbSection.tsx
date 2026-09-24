@@ -45,8 +45,11 @@ export function TheaterControlsSpotlightsRgbSection({ vm, spot }: SpotlightsSect
           +
         </TheaterBtn>
         <TheaterBtn
-          className="theater-btn--visibility"
-          active={allEnabled}
+          className={cn(
+            "theater-btn--visibility",
+            "theater-btn--all",
+            allEnabled && "theater-btn--visibility-on",
+          )}
           disabled={!vm.currentScene || rgbSpotlights.length === 0}
           title={allEnabled ? "Выключить все" : "Включить все"}
           onClick={() => {
@@ -55,6 +58,7 @@ export function TheaterControlsSpotlightsRgbSection({ vm, spot }: SpotlightsSect
           }}
         >
           <span className="theater-spotlight-power-dot" />
+          Все
         </TheaterBtn>
       </div>
       <div className="theater-sidebar-home theater-spotlight-nav-list">

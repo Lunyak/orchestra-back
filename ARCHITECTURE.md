@@ -61,7 +61,7 @@ features/<name>/
 | `script-ui` | Плейлист, панели, edit mode |
 | `team` | `useTeam()` — участники на settings/board/troupe/sessions |
 | `spectacle` | Оболочка главной страницы (вкладки script/theater/board/…) |
-| `theater` | 3D театр (заморожен по рефакторингу) |
+| `theater` | 3D театр. Печатный пакет (план + лист приборов): [docs/theater-print-package.md](docs/theater-print-package.md) |
 | `rehearsals` | Репетиции + RTK |
 | `director-sessions` | Сессии режиссёра + RTK |
 | `troupe` | Расписание труппы, RTK `myTroupe` + `useTroupePage` |

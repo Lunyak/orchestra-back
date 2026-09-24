@@ -21,6 +21,10 @@ export type SiteEvent = {
   date?: string;
   /** Card/preview image for Events page */
   cardImage: string;
+  /** Short poster used only in the mobile afisha list. */
+  listImage?: string;
+  /** Wide image split across the afisha side panels. */
+  sideImage?: string;
   /** Optional background image for Event page */
   eventPageBg?: string;
   /** Disable frosted glass overlay on Event page */
@@ -117,6 +121,8 @@ function normalizeEvent(raw: any): SiteEvent | null {
       : typeof raw.bgImage === "string"
         ? raw.bgImage
         : undefined;
+  const sideImage = typeof raw.sideImage === "string" ? raw.sideImage.trim() : undefined;
+  const listImage = typeof raw.listImage === "string" ? raw.listImage.trim() : undefined;
   const disableGlass = raw.disableGlass === true ? true : undefined;
 
   const ticketsCloudEventId =
@@ -164,6 +170,8 @@ function normalizeEvent(raw: any): SiteEvent | null {
     anonse,
     date,
     cardImage,
+    ...(listImage ? { listImage } : null),
+    ...(sideImage ? { sideImage } : null),
     ...(disableGlass ? { disableGlass: true } : null),
     type,
     colorBackground,
@@ -245,6 +253,8 @@ export function mergeSiteEventsWithFallback(
       date: pickText(event.date, fb.date),
       type: pickText(event.type, fb.type),
       eventPageBg: pickText(event.eventPageBg, fb.eventPageBg),
+      sideImage: pickText(event.sideImage, fb.sideImage),
+      listImage: pickText(event.listImage, fb.listImage),
       rainAudioUrl: pickText(event.rainAudioUrl, fb.rainAudioUrl),
       rainButtonLabel: pickText(event.rainButtonLabel, fb.rainButtonLabel),
       ticketsCloudEventId: pickText(event.ticketsCloudEventId, fb.ticketsCloudEventId),

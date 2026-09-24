@@ -23,8 +23,8 @@ export function TheaterControlsCopyTab({ vm }: TheaterControlsTabProps) {
   ];
   const copyOptions = { categories, scope };
   const hasCategories = categories.length > 0;
-  const hasPrevious = vm.currentPage > 0;
-  const hasNext = vm.currentPage < vm.sceneCount - 1;
+  const hasPrevious = vm.copyHasPreviousPicture;
+  const hasNext = vm.copyHasNextPicture;
   const selectedModelIds =
     vm.multiSelectedModelIds.length > 0
       ? vm.multiSelectedModelIds
@@ -89,14 +89,24 @@ export function TheaterControlsCopyTab({ vm }: TheaterControlsTabProps) {
     vm.clearTheaterSpotlights();
   };
 
+  const scopeHint =
+    scope === "all"
+      ? "Все объекты выбранных категорий на этой сцене."
+      : "Только то, что сейчас выделено на сцене.";
+  const sendHint =
+    scope === "all"
+      ? "На соседней картине эти категории заменятся. Остальные картины не трогаются."
+      : "Выбранное добавится на соседнюю картину. Остальные картины не трогаются.";
+
   return (
-    <div className="theater-layout-panel">
+    <div className="theater-layout-panel theater-layout-panel--copy">
       <TheaterCollapsibleSection
-        sectionId="copy-categories"
-        title="Что копировать"
-        summary="Мебель, декор, софиты"
+        sectionId="copy-source"
+        title="1. Что берём"
+        summary="Категории и объём"
         defaultOpen
       >
+        <p className="theater-copy-lead">Отметьте категории.</p>
         <div className="theater-compact-checks">
           <LabeledCheckbox
             checked={includeFurniture}
@@ -111,98 +121,100 @@ export function TheaterControlsCopyTab({ vm }: TheaterControlsTabProps) {
             checked={includeSpotlights}
             onChange={setIncludeSpotlights}
           >
-            Софиты и настройки ({spotlightCount})
+            Софиты и их настройки ({spotlightCount})
           </LabeledCheckbox>
         </div>
-        <p className="theater-layout-hint">Источник на этой сцене</p>
+        <p className="theater-copy-lead">Сколько объектов.</p>
         <div className="theater-btn-row">
           <TheaterBtn
             active={scope === "all"}
             onClick={() => setScope("all")}
           >
-            Все
+            Все на сцене
           </TheaterBtn>
           <TheaterBtn
             active={scope === "selected"}
             onClick={() => setScope("selected")}
           >
-            Выбранные
+            Только выбранные
           </TheaterBtn>
         </div>
+        <p className="theater-layout-hint">{scopeHint}</p>
       </TheaterCollapsibleSection>
       <TheaterCollapsibleSection
-        sectionId="copy-to-scene"
-        title="На другую сцену"
-        summary="С теми же координатами"
+        sectionId="copy-send"
+        title="2. Отправить на соседнюю картину"
+        summary="Только эта картина"
         defaultOpen
       >
-        <p className="theater-layout-hint">
-          Все — заменить на соседней. Выбранные — добавить.
-        </p>
-        <div className="theater-btn-row">
+        <p className="theater-layout-hint">{sendHint}</p>
+        <div className="theater-btn-row theater-btn-row--stack">
           <TheaterBtn
             disabled={!canCopyOut || !hasPrevious}
-            title="Скопировать на предыдущую сцену"
+            title="Скопировать на предыдущую картину"
             onClick={() =>
-              vm.copyTheaterSetToAdjacentScene("previous", copyOptions)
+              vm.copyTheaterSetToAdjacentPicture("previous", copyOptions)
             }
           >
-            ← Предыдущая
+            На предыдущую картину
           </TheaterBtn>
           <TheaterBtn
             disabled={!canCopyOut || !hasNext}
-            title="Скопировать на следующую сцену"
-            onClick={() => vm.copyTheaterSetToAdjacentScene("next", copyOptions)}
+            title="Скопировать на следующую картину"
+            onClick={() => vm.copyTheaterSetToAdjacentPicture("next", copyOptions)}
           >
-            Следующая →
+            На следующую картину
           </TheaterBtn>
         </div>
       </TheaterCollapsibleSection>
       <TheaterCollapsibleSection
-        sectionId="copy-from-scene"
-        title="Взять с другой сцены"
-        summary="Заменить выбранные категории"
-        defaultOpen
+        sectionId="copy-pull"
+        title="3. Взять с соседней картины"
+        summary="Подставить в эту картину"
       >
         <p className="theater-layout-hint">
-          Берёт все объекты категорий, не только выделение.
+          В эту картину попадут все объекты отмеченных категорий. Другие картины
+          на сцене останутся как есть.
         </p>
-        <div className="theater-btn-row">
+        <div className="theater-btn-row theater-btn-row--stack">
           <TheaterBtn
             disabled={!canApplyIn || !hasPrevious}
-            title="Взять с предыдущей сцены"
+            title="Взять с предыдущей картины"
             onClick={() =>
-              vm.applyTheaterSetFromAdjacentScene("previous", copyOptions)
+              vm.applyTheaterSetFromAdjacentPicture("previous", copyOptions)
             }
           >
-            ← С предыдущей
+            С предыдущей картины
           </TheaterBtn>
           <TheaterBtn
             disabled={!canApplyIn || !hasNext}
-            title="Взять со следующей сцены"
+            title="Взять со следующей картины"
             onClick={() =>
-              vm.applyTheaterSetFromAdjacentScene("next", copyOptions)
+              vm.applyTheaterSetFromAdjacentPicture("next", copyOptions)
             }
           >
-            Со следующей →
+            Со следующей картины
           </TheaterBtn>
         </div>
       </TheaterCollapsibleSection>
       <TheaterCollapsibleSection
-        sectionId="copy-kadrs"
-        title="Картины"
-        summary="Снимок мизансцены"
-        defaultOpen
+        sectionId="copy-kadr"
+        title="4. Картина"
+        summary="Записать или применить снимок"
       >
         {hasKadrs ? (
           <>
+            <p className="theater-layout-hint">
+              Снимок мизансцены. «Записать» сохраняет текущий набор, «Взять» —
+              ставит его на эту сцену.
+            </p>
             <TheaterSelect
               label="Картина"
               value={resolvedKadrId}
               options={kadrOptions}
               onChange={setKadrId}
             />
-            <div className="theater-btn-row">
+            <div className="theater-btn-row theater-btn-row--stack">
               <TheaterBtn
                 disabled={!canUseKadr}
                 title="Записать выбранное в снимок картины"
@@ -210,7 +222,7 @@ export function TheaterControlsCopyTab({ vm }: TheaterControlsTabProps) {
                   vm.writeTheaterSetToKadr(resolvedKadrId, copyOptions)
                 }
               >
-                Записать
+                Записать в картину
               </TheaterBtn>
               <TheaterBtn
                 disabled={!canApplyKadr}
@@ -219,7 +231,7 @@ export function TheaterControlsCopyTab({ vm }: TheaterControlsTabProps) {
                   vm.applyTheaterSetFromKadr(resolvedKadrId, copyOptions)
                 }
               >
-                Взять
+                Взять из картины
               </TheaterBtn>
             </div>
           </>
@@ -230,28 +242,29 @@ export function TheaterControlsCopyTab({ vm }: TheaterControlsTabProps) {
         )}
       </TheaterCollapsibleSection>
       <TheaterCollapsibleSection
-        sectionId="copy-clear"
-        title="Очистить эту сцену"
-        summary="Мебель и свет отдельно"
-        defaultOpen
+        sectionId="copy-wipe"
+        title="5. Удалить с этой сцены"
+        summary="Мебель или свет"
       >
         <p className="theater-layout-hint">
-          Актёров и декор не трогает. Софиты удаляются вместе с настройками.
+          Актёров и декор не трогает. Свет удаляется вместе с настройками.
         </p>
-        <div className="theater-btn-row">
+        <div className="theater-btn-row theater-btn-row--stack">
           <TheaterBtn
+            className="theater-btn--danger"
             disabled={!canClearFurniture}
             title="Удалить всю мебель на этой сцене"
             onClick={clearFurniture}
           >
-            Мебель ({allFurnitureCount})
+            Удалить мебель ({allFurnitureCount})
           </TheaterBtn>
           <TheaterBtn
+            className="theater-btn--danger"
             disabled={!canClearSpotlights}
             title="Удалить все софиты на этой сцене"
             onClick={clearSpotlights}
           >
-            Свет ({allSpotlightCount})
+            Удалить свет ({allSpotlightCount})
           </TheaterBtn>
         </div>
       </TheaterCollapsibleSection>

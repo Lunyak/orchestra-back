@@ -25,6 +25,7 @@ import {
   type TheaterModelTransformPatch,
 } from "../model/theater-model-transform";
 import { MODEL_TRANSFORM_HISTORY_GRACE_MS } from "../model/theater-model-helpers";
+import { expandModelIdsWithGroups } from "../model/theater-model-groups";
 import { isLightTrussModel } from "../model/theater-truss-mounts";
 import { setLightTrussHeight } from "../model/theater-light-rig";
 
@@ -264,6 +265,34 @@ export function useTheaterModelsTransform({
       }
     }
     const patch = applyActiveModelTransform();
+    const baseline = groupDragBaselineRef.current;
+    if (
+      patch &&
+      activeModelId &&
+      baseline &&
+      modelTransformMode === "translate" &&
+      baseline.size > 1 &&
+      baseline.has(activeModelId)
+    ) {
+      const origin = baseline.get(activeModelId)!.position;
+      const dx = patch.position[0] - origin[0];
+      const dy = patch.position[1] - origin[1];
+      const dz = patch.position[2] - origin[2];
+      updateModels(
+        models.map((model) => {
+          const base = baseline.get(model.id);
+          if (!base || model.id === activeModelId) return model;
+          return {
+            ...model,
+            position: [
+              base.position[0] + dx,
+              base.position[1] + dy,
+              base.position[2] + dz,
+            ] as [number, number, number],
+          };
+        }),
+      );
+    }
     const transformActiveModel = models.find((item) => item.id === activeModelId);
     if (patch && activeModelId && isLightTrussModel(transformActiveModel)) {
       const nextModels = models.map((item) =>
@@ -276,8 +305,10 @@ export function useTheaterModelsTransform({
     activeModelId,
     applyActiveModelTransform,
     beginTheaterHistoryTransaction,
+    modelTransformMode,
     models,
     syncSpotlightsForModels,
+    updateModels,
   ]);
 
   const handleModelTransformEnd = useCallback(() => {
@@ -331,14 +362,23 @@ export function useTheaterModelsTransform({
         ],
       };
     }
+    const dragIds =
+      activeModelId != null
+        ? expandModelIdsWithGroups(
+            models,
+            multiSelectedModelIds.includes(activeModelId)
+              ? multiSelectedModelIds
+              : [activeModelId],
+          )
+        : [];
     if (
       modelTransformMode === "translate" &&
       activeModelId != null &&
-      multiSelectedModelIds.length > 1 &&
-      multiSelectedModelIds.includes(activeModelId)
+      dragIds.length > 1 &&
+      dragIds.includes(activeModelId)
     ) {
       const baseline = new Map<number, TheaterModelTransformPatch>();
-      multiSelectedModelIds.forEach((id) => {
+      dragIds.forEach((id) => {
         const model = models.find((item) => item.id === id);
         if (!model) return;
         baseline.set(id, {
@@ -453,11 +493,14 @@ export function useTheaterModelsTransform({
   const nudgeActiveModel = useCallback(
     (deltaX: number, deltaZ: number) => {
       const targetIds =
-        multiSelectedModelIds.length > 1
-          ? multiSelectedModelIds
-          : activeModelId != null
-            ? [activeModelId]
-            : [];
+        activeModelId != null
+          ? expandModelIdsWithGroups(
+              models,
+              multiSelectedModelIds.length > 1
+                ? multiSelectedModelIds
+                : [activeModelId],
+            )
+          : [];
       if (targetIds.length === 0) return;
 
       const selected = new Set(targetIds);

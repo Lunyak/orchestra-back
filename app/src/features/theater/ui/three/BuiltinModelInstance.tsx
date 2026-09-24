@@ -11,6 +11,7 @@ import { getTheaterAssetLibraryItem } from "../../model/theater-asset-library";
 import { LIGHT_TRUSS_6M_BASE } from "../../model/theater-model-world-size";
 import { BuiltinModel } from "./BuiltinModel";
 import { dropStaleTheaterModelClones } from "./drop-stale-theater-model-clones";
+import { ModelSelectionFrame } from "./ModelSelectionFrame";
 
 const FURNITURE_SELECTION_BUILTINS = new Set<
   NonNullable<TheaterModel["builtin"]>
@@ -201,6 +202,21 @@ export const BuiltinModelInstance = ({
           />
         </mesh>
       ) : null}
+      <ModelSelectionFrame
+        visible={isSelected === true}
+        size={
+          selectionBox?.size ??
+          model.decorSize ??
+          [1, 1, 1]
+        }
+        center={
+          selectionBox?.center ?? [
+            0,
+            (model.decorSize?.[1] ?? 1) / 2,
+            0,
+          ]
+        }
+      />
       {selectionBox && model.isRequisite === true ? (
         <mesh
           position={selectionBox.center}

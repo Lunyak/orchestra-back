@@ -1,4 +1,5 @@
 import { FC } from "react";
+import { useLocation } from "react-router-dom";
 import { ChalkPageShell } from "../../shared/component/ChalkPageShell/ChalkPageShell";
 import { Seo } from "../../shared/component/Seo/Seo";
 import "./style.css";
@@ -45,13 +46,18 @@ const CONTACT_ROWS: ContactRow[] = [
 ];
 
 const ContactsPage: FC = () => {
+  const { pathname } = useLocation();
+  const showSeo = pathname === "/контакты" || pathname === "/contacts";
+
   return (
-    <ChalkPageShell mainClassName="chalk-page__main--contacts" scrollable showHomeBack>
+    <ChalkPageShell mainClassName="chalk-page__main--contacts" scrollable showHomeBack showSectionNav={false}>
+      {showSeo && (
       <Seo
         title="Контакты — Театр «Дофамин»"
         description="Контакты театра «Дофамин»: почта, Telegram, ВКонтакте и как нас найти."
         canonicalPath="/контакты"
       />
+      )}
 
       <h1 className="chalk-page__title">КОНТАКТЫ</h1>
       <p className="chalk-page__subtitle">связь и как нас найти</p>

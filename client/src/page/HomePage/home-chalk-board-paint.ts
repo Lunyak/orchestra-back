@@ -46,6 +46,7 @@ type PaintOptions = {
   gridProgress?: number;
   winMorphIndex?: number | null;
   winMorphProgress?: number;
+  triangleSpin?: number;
 };
 
 function drawCellMark(
@@ -56,7 +57,8 @@ function drawCellMark(
   animProgress: number,
   layerPasses: number,
   winMorphIndex: number | null,
-  winMorphProgress: number
+  winMorphProgress: number,
+  triangleSpin: number
 ) {
   const { cx, cy } = cellCenter(index);
   const seed = markSeed(index, mark);
@@ -77,7 +79,7 @@ function drawCellMark(
   }
 
   if (morphT > 0) {
-    drawNeonLogoTriangle(ctx, cx, cy, CELL_SIZE * 0.58, morphT, seed);
+    drawNeonLogoTriangle(ctx, cx, cy, CELL_SIZE * 0.58, morphT, seed, triangleSpin);
   }
 }
 
@@ -93,6 +95,7 @@ export function paintChalkBoard(
     gridProgress = 1,
     winMorphIndex = null,
     winMorphProgress = 0,
+    triangleSpin = 0,
   } = options;
 
   const size = syncBoardCanvasSize(canvas, wrap);
@@ -124,7 +127,8 @@ export function paintChalkBoard(
       animProgress,
       layerPasses,
       winMorphIndex,
-      winMorphProgress
+      winMorphProgress,
+      triangleSpin
     );
   }
 

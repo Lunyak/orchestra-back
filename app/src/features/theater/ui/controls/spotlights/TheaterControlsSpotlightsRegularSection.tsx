@@ -1,3 +1,4 @@
+import cn from "classnames";
 import { LabeledCheckbox } from "../../../../../shared/core/labeled-checkbox/LabeledCheckbox";
 import { TheaterBtn } from "../../theater-controls-ui";
 import { TheaterSpotlightNavEmpty } from "./TheaterSpotlightNavEmpty";
@@ -38,8 +39,11 @@ export function TheaterControlsSpotlightsRegularSection({ vm, spot }: Spotlights
           +
         </TheaterBtn>
         <TheaterBtn
-          className="theater-btn--visibility"
-          active={allEnabled}
+          className={cn(
+            "theater-btn--visibility",
+            "theater-btn--all",
+            allEnabled && "theater-btn--visibility-on",
+          )}
           disabled={!vm.currentScene}
           title={allEnabled ? "Выключить все" : "Включить все"}
           onClick={() => {
@@ -48,6 +52,7 @@ export function TheaterControlsSpotlightsRegularSection({ vm, spot }: Spotlights
           }}
         >
           <span className="theater-spotlight-power-dot" />
+          Все
         </TheaterBtn>
       </div>
       <div className="theater-sidebar-home theater-spotlight-nav-list">

@@ -18,6 +18,7 @@ type TheaterModelPayload = {
   decorTextureRepeat?: number | null;
   decorTextureMode?: string | null;
   decorTextureFaces?: unknown;
+  groupId?: number | null;
 };
 
 export function flattenClientTheaterModels(scene: {
@@ -63,6 +64,9 @@ export function prismaTheaterModelRowToClient(row: Record<string, unknown>) {
     decorTextureRepeat: row.decorTextureRepeat ?? undefined,
     decorTextureMode: row.decorTextureMode ?? undefined,
     decorTextureFaces: row.decorTextureFaces ?? undefined,
+    ...(typeof row.groupId === 'number' && row.groupId > 0
+      ? { groupId: row.groupId }
+      : {}),
   };
 }
 
@@ -110,5 +114,9 @@ export function clientTheaterModelToPrisma(
         ? m.decorTextureMode.trim()
         : null,
     decorTextureFaces: m?.decorTextureFaces ?? null,
+    groupId:
+      typeof m?.groupId === 'number' && Number.isFinite(m.groupId) && m.groupId > 0
+        ? Math.trunc(m.groupId)
+        : null,
   };
 }

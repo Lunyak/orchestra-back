@@ -146,6 +146,40 @@ const KADR_REQUISITE_ACTIONS: ReadonlySet<SceneLightKadrRequisiteActionV1> = new
   "use",
 ]);
 
+function normalizeKadrTheaterSnapshot(
+  raw: unknown,
+): SceneLightKadrV1["theaterSnapshot"] | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const snapshot = raw as NonNullable<SceneLightKadrV1["theaterSnapshot"]>;
+  const theaterModels = Array.isArray(snapshot.theaterModels)
+    ? snapshot.theaterModels
+    : undefined;
+  const theaterDecor = Array.isArray(snapshot.theaterDecor)
+    ? snapshot.theaterDecor
+    : undefined;
+  const theaterSpotlights = Array.isArray(snapshot.theaterSpotlights)
+    ? snapshot.theaterSpotlights
+    : undefined;
+  const theaterSmokeMachine =
+    typeof snapshot.theaterSmokeMachine === "boolean"
+      ? snapshot.theaterSmokeMachine
+      : undefined;
+  if (
+    !theaterModels &&
+    !theaterDecor &&
+    !theaterSpotlights &&
+    theaterSmokeMachine == null
+  ) {
+    return undefined;
+  }
+  return {
+    ...(theaterModels ? { theaterModels } : {}),
+    ...(theaterDecor ? { theaterDecor } : {}),
+    ...(theaterSpotlights ? { theaterSpotlights } : {}),
+    ...(theaterSmokeMachine != null ? { theaterSmokeMachine } : {}),
+  };
+}
+
 function normalizeKadrRequisites(
   raw: SceneLightKadrV1["requisites"] | null | undefined,
 ): SceneLightKadrRequisiteCueV1[] {
@@ -206,6 +240,7 @@ function normalizeLightKadr(raw: Partial<SceneLightKadrV1> | null | undefined): 
     typeof raw.imageMarkdown === "string" ? raw.imageMarkdown.trim() || undefined : undefined;
   const blackoutDurationSec = normalizeOptionalPositiveSec(raw.blackoutDurationSec);
   const smokeDurationSec = normalizeOptionalPositiveSec(raw.smokeDurationSec);
+  const theaterSnapshot = normalizeKadrTheaterSnapshot(raw.theaterSnapshot);
   return {
     id: raw.id.trim(),
     kadrNo,
@@ -227,6 +262,7 @@ function normalizeLightKadr(raw: Partial<SceneLightKadrV1> | null | undefined): 
     ...(blackoutDurationSec != null ? { blackoutDurationSec } : {}),
     ...(smokeDurationSec != null ? { smokeDurationSec } : {}),
     ...(imageMarkdown ? { imageMarkdown } : {}),
+    ...(theaterSnapshot ? { theaterSnapshot } : {}),
     note: typeof raw.note === "string" ? raw.note.trim() || undefined : undefined,
     updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : undefined,
   };

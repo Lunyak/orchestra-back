@@ -11,6 +11,12 @@ import {
   findSeatingTargetForHuman,
   seatHumanOnFurniture,
 } from "../model/theater-model-seating";
+import {
+  expandModelIdsWithGroups,
+  groupTheaterModels,
+  selectionHasModelGroup,
+  ungroupTheaterModels,
+} from "../model/theater-model-groups";
 import type { TheaterEditMode } from "./use-theater-selection";
 
 type UseTheaterModelsSelectionOpsArgs = {
@@ -22,6 +28,7 @@ type UseTheaterModelsSelectionOpsArgs = {
   setDecorActionMessage: (message: string | null) => void;
   setPendingSnapModelId: Dispatch<SetStateAction<number | null>>;
   setEditMode: Dispatch<SetStateAction<TheaterEditMode>>;
+  setMultiSelectedModelIds: Dispatch<SetStateAction<number[]>>;
 };
 
 export function useTheaterModelsSelectionOps({
@@ -33,6 +40,7 @@ export function useTheaterModelsSelectionOps({
   setDecorActionMessage,
   setPendingSnapModelId,
   setEditMode,
+  setMultiSelectedModelIds,
 }: UseTheaterModelsSelectionOpsArgs) {
   const alignModelsByActive = useCallback(
     (axis: "x" | "z") => {
@@ -81,6 +89,38 @@ export function useTheaterModelsSelectionOps({
     [models, multiSelectedModelIds, setDecorActionMessage, updateModels],
   );
 
+  const groupSelectedModels = useCallback(() => {
+    if (multiSelectedModelIds.length < 2) return;
+    const memberIds = expandModelIdsWithGroups(models, multiSelectedModelIds);
+    updateModels(groupTheaterModels(models, memberIds));
+    setMultiSelectedModelIds(memberIds);
+    setDecorActionMessage(`Объединено объектов: ${memberIds.length}`);
+  }, [
+    models,
+    multiSelectedModelIds,
+    setDecorActionMessage,
+    setMultiSelectedModelIds,
+    updateModels,
+  ]);
+
+  const ungroupSelectedModels = useCallback(() => {
+    const sourceIds =
+      multiSelectedModelIds.length > 0
+        ? multiSelectedModelIds
+        : activeModelId != null
+          ? [activeModelId]
+          : [];
+    if (!selectionHasModelGroup(models, sourceIds)) return;
+    updateModels(ungroupTheaterModels(models, sourceIds));
+    setDecorActionMessage("Группа разобрана");
+  }, [
+    activeModelId,
+    models,
+    multiSelectedModelIds,
+    setDecorActionMessage,
+    updateModels,
+  ]);
+
   const seatActiveHumanOnFurniture = useCallback(() => {
     if (!currentScene || !activeModelId) return;
     const human = models.find((item) => item.id === activeModelId);
@@ -120,6 +160,8 @@ export function useTheaterModelsSelectionOps({
     alignSelectedModels,
     distributeSelectedModels,
     setSelectedModelsVisibility,
+    groupSelectedModels,
+    ungroupSelectedModels,
     seatActiveHumanOnFurniture,
   };
 }

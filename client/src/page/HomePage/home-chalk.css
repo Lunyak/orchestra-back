@@ -1,8 +1,11 @@
 .home-chalk-game {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   width: 100%;
+  min-height: 0;
 }
 
 .home-chalk-game__status {
@@ -54,6 +57,10 @@
 
 .home-chalk-game__cell:disabled {
   cursor: default;
+}
+
+.home-chalk-game__cell--win {
+  cursor: pointer;
 }
 
 .home-chalk-game__cell--win::after {

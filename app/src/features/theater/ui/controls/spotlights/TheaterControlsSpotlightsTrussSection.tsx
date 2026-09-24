@@ -120,8 +120,11 @@ export function TheaterControlsSpotlightsTrussSection({
           +
         </TheaterBtn>
         <TheaterBtn
-          className="theater-btn--visibility"
-          active={allVisible}
+          className={cn(
+            "theater-btn--visibility",
+            "theater-btn--all",
+            allVisible && "theater-btn--visibility-on",
+          )}
           disabled={!vm.currentScene || trusses.length === 0}
           title={allVisible ? "Скрыть все" : "Показать все"}
           onClick={() => {
@@ -134,6 +137,7 @@ export function TheaterControlsSpotlightsTrussSection({
           }}
         >
           <span className="theater-spotlight-power-dot" />
+          Все
         </TheaterBtn>
       </div>
       <TheaterRangeField

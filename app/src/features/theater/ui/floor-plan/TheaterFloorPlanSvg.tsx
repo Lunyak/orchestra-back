@@ -53,6 +53,7 @@ export type TheaterFloorPlanSvgProps = TheaterFloorPlanGeometry & {
   ) => void;
   onSelectModel: (id: number, additive?: boolean) => void;
   onModelContextMenu: (id: number, clientX: number, clientY: number) => void;
+  onSpotlightContextMenu?: (id: number, clientX: number, clientY: number) => void;
   handlePointerDown: (event: React.PointerEvent<SVGSVGElement>) => void;
   handlePointerMove: (event: React.PointerEvent<SVGSVGElement>) => void;
   handlePointerUp: (event: React.PointerEvent<SVGSVGElement>) => void;
@@ -107,6 +108,7 @@ export function TheaterFloorPlanSvg({
   onSelectSpotlight,
   onSelectModel,
   onModelContextMenu,
+  onSpotlightContextMenu,
   handlePointerDown,
   handlePointerMove,
   handlePointerUp,
@@ -504,7 +506,7 @@ export function TheaterFloorPlanSvg({
                   onContextMenu={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
-                    onSelectSpotlight(item.id, false, event.clientX, event.clientY);
+                    onSpotlightContextMenu?.(item.id, event.clientX, event.clientY);
                   }}
                 />
                 <circle
@@ -530,7 +532,7 @@ export function TheaterFloorPlanSvg({
                   onContextMenu={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
-                    onSelectSpotlight(item.id, false, event.clientX, event.clientY);
+                    onSpotlightContextMenu?.(item.id, event.clientX, event.clientY);
                   }}
                 />
               </g>
@@ -559,7 +561,6 @@ export function TheaterFloorPlanSvg({
               onContextMenu={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                onSelectModel(item.id);
                 onModelContextMenu(item.id, event.clientX, event.clientY);
               }}
             >

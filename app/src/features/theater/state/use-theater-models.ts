@@ -11,6 +11,7 @@ import {
   type TheaterModelWorldSize,
 } from "../model/theater-model-world-size";
 import { readSceneTheaterModels } from "../model/theater-scene-models";
+import { useTheaterKadrDraftModels } from "../model/theater-active-kadr";
 import { cloneTheaterModels } from "../model/theater-model-clone";
 import type { UseTheaterModelsArgs } from "./theater-models-types";
 import { useTheaterModelsPersistence } from "./use-theater-models-persistence";
@@ -51,6 +52,7 @@ export function useTheaterModels({
   const [modelTransformMode, setModelTransformMode] = useState<
     "translate" | "rotate" | "scale"
   >("translate");
+  const [modelDragArmed, setModelDragArmed] = useState(false);
   const [builtinModelKey, setBuiltinModelKey] = useState<TheaterModel["builtin"]>(
     "table",
   );
@@ -66,7 +68,8 @@ export function useTheaterModels({
   );
   const [activeModelSizeTick, setActiveModelSizeTick] = useState(0);
 
-  const models = readSceneTheaterModels(currentScene);
+  const draftModels = useTheaterKadrDraftModels();
+  const models = draftModels ?? readSceneTheaterModels(currentScene);
   const visibleModels = useMemo(
     () => models.filter((model) => !model.hidden),
     [models],
@@ -160,6 +163,8 @@ export function useTheaterModels({
     alignSelectedModels,
     distributeSelectedModels,
     setSelectedModelsVisibility,
+    groupSelectedModels,
+    ungroupSelectedModels,
     seatActiveHumanOnFurniture,
   } = useTheaterModelsSelectionOps({
     currentScene,
@@ -170,6 +175,7 @@ export function useTheaterModels({
     setDecorActionMessage,
     setPendingSnapModelId,
     setEditMode,
+    setMultiSelectedModelIds,
   });
 
   const {
@@ -224,6 +230,8 @@ export function useTheaterModels({
     activeModelObjectId,
     modelTransformMode,
     setModelTransformMode,
+    modelDragArmed,
+    setModelDragArmed,
     builtinModelKey,
     setBuiltinModelKey,
     hoveredModelId,
@@ -244,6 +252,8 @@ export function useTheaterModels({
     alignSelectedModels,
     distributeSelectedModels,
     setSelectedModelsVisibility,
+    groupSelectedModels,
+    ungroupSelectedModels,
     removeSelectedModels,
     cloneSelectedModels,
     removeModel,

@@ -7,7 +7,6 @@ import type {
 import { TheaterControlsCopyTab } from "./TheaterControlsCopyTab";
 import { TheaterControlsDecorTab } from "./TheaterControlsDecorTab";
 import { TheaterControlsLayoutTab } from "./TheaterControlsLayoutTab";
-import { TheaterControlsModelsTab } from "./TheaterControlsModelsTab";
 import { TheaterControlsSpotlightsTab } from "./TheaterControlsSpotlightsTab";
 import type { TheaterControlsTabProps } from "./types";
 
@@ -28,7 +27,6 @@ export function TheaterControlsSettings({
   onOpenRoomSection,
 }: TheaterControlsSettingsProps) {
   const { activeTab } = vm;
-  const isModelsTab = activeTab === "models";
   const isSpotlightsTab = activeTab === "spotlights";
   const isRoomNav = activeTab === "layout" && layoutSection === "room" && roomSection == null;
 
@@ -37,7 +35,6 @@ export function TheaterControlsSettings({
       className={cn(
         "theater-controls-settings",
         "theater-controls--stage-brutal",
-        isModelsTab && "theater-controls-settings--fill",
         (isSpotlightsTab || isRoomNav) && "theater-controls-settings--nav",
       )}
     >
@@ -48,7 +45,6 @@ export function TheaterControlsSettings({
           onOpenSection={onOpenSpotlightsSection ?? (() => undefined)}
         />
       ) : null}
-      {isModelsTab ? <TheaterControlsModelsTab vm={vm} /> : null}
       {activeTab === "copy" ? <TheaterControlsCopyTab vm={vm} /> : null}
       {activeTab === "decor" ? <TheaterControlsDecorTab vm={vm} /> : null}
       {activeTab === "layout" ? (

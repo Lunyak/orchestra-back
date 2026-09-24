@@ -11,6 +11,7 @@ import {
   resolveOutlinerCameraFocus,
 } from "../model/theater-camera-focus";
 import { setModelsVisibilityBySelection } from "../model/theater-model-align";
+import { modelGroupMemberIds } from "../model/theater-model-groups";
 import { setSpotlightsVisibilityByIds } from "../model/theater-spotlight-selection";
 import type { TheaterEditMode } from "./use-theater-selection";
 import type { TheaterViewPrefs } from "../model/theater-view-prefs-storage";
@@ -376,6 +377,24 @@ export function useTheaterSceneOutliner({
         pulseTimerRef.current = null;
       }, 1400);
 
+      const selectModelGroup = (modelId: number, additiveSelection: boolean) => {
+        const groupIds = modelGroupMemberIds(models, modelId);
+        if (groupIds.length < 2) return;
+        if (!additiveSelection) {
+          setMultiSelectedModelIds(groupIds);
+          return;
+        }
+        const selected = new Set(multiSelectedModelIds);
+        const groupSelected = groupIds.every((memberId) => selected.has(memberId));
+        if (groupSelected) {
+          groupIds.forEach((memberId) => selected.delete(memberId));
+          setMultiSelectedModelIds(selected.size > 0 ? [...selected] : [modelId]);
+          return;
+        }
+        groupIds.forEach((memberId) => selected.add(memberId));
+        setMultiSelectedModelIds([...selected]);
+      };
+
       switch (item.kind) {
         case "spotlight":
           setLayoutOutlineFocused(false);
@@ -391,6 +410,7 @@ export function useTheaterSceneOutliner({
           setLightRigFocused(false);
           setEditMode("models");
           selectTheaterModel(item.id, additive);
+          selectModelGroup(item.id, additive);
           return;
         case "decor":
           setLayoutOutlineFocused(false);
@@ -400,6 +420,7 @@ export function useTheaterSceneOutliner({
           setEditMode("decor");
           exitDecorPlaceMode();
           selectTheaterModel(item.id, additive);
+          selectModelGroup(item.id, additive);
           return;
         case "door":
           setLayoutOutlineFocused(false);
@@ -426,6 +447,7 @@ export function useTheaterSceneOutliner({
       layout,
       layoutDoors,
       models,
+      multiSelectedModelIds,
       selectTheaterModel,
       selectTheaterSpotlight,
       setActiveDoorId,
@@ -433,6 +455,7 @@ export function useTheaterSceneOutliner({
       setEditMode,
       setLayoutOutlineFocused,
       setLightRigFocused,
+      setMultiSelectedModelIds,
       setStageGridFocused,
     ],
   );

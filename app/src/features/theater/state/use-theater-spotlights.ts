@@ -35,6 +35,14 @@ import type {
 } from "../../playbook/model/playbook-slice";
 import { applyFadersToSpotlightsPerChannelDisplay } from "../model/theater-light-fader-bindings";
 import { readSceneTheaterModels } from "../model/theater-scene-models";
+import { commitActiveKadrTheaterSet } from "../model/kadr-theater-snapshot";
+import {
+  getTheaterActiveKadrId,
+  getTheaterKadrDraft,
+  replaceTheaterKadrDraft,
+  takeKadrTheaterBaseline,
+  useTheaterKadrDraftSpotlights,
+} from "../model/theater-active-kadr";
 import {
   getOccupiedTrussMountPointIds,
   isLightTrussModel,
@@ -91,8 +99,10 @@ export function useTheaterSpotlights({
     useState<TrussMountFixtureType>("regular");
   const spotlightsRaw = currentScene?.theaterSpotlights;
   const spotlights = spotlightsRaw ?? [];
+  const draftSpotlights = useTheaterKadrDraftSpotlights();
   const displaySpotlights =
-    spotlightsRaw === undefined ? DEFAULT_SPOTLIGHTS : spotlightsRaw;
+    draftSpotlights ??
+    (spotlightsRaw === undefined ? DEFAULT_SPOTLIGHTS : spotlightsRaw);
   const spotlightsConfigured = spotlightsRaw !== undefined;
   const activeSpotlight =
     activeSpotlightId != null
@@ -176,12 +186,31 @@ export function useTheaterSpotlights({
     (next: TheaterSpotlight[]) => {
       recordTheaterHistory();
       const normalized = normalizeSpotlights(next);
+      const kadrId = getTheaterActiveKadrId();
+      const draft = getTheaterKadrDraft();
+      if (kadrId && currentScene && draft) {
+        const savedBaseline = takeKadrTheaterBaseline();
+        const lightKadrs = commitActiveKadrTheaterSet({
+          scene: currentScene,
+          activeKadrId: kadrId,
+          previousModels: savedBaseline?.models ?? draft.models,
+          nextModels: draft.models,
+          previousSpotlights: savedBaseline?.spotlights ?? draft.spotlights,
+          nextSpotlights: normalized,
+        });
+        replaceTheaterKadrDraft({
+          models: draft.models,
+          spotlights: normalized,
+        });
+        if (lightKadrs) updateCurrentScene({ lightKadrs });
+        return;
+      }
       updateCurrentScene({
         theaterSpotlights: normalized,
         lightPlot: buildLightPlotFromSpotlights(normalized, layout),
       });
     },
-    [layout, normalizeSpotlights, recordTheaterHistory, updateCurrentScene],
+    [currentScene, layout, normalizeSpotlights, recordTheaterHistory, updateCurrentScene],
   );
 
   const cloneSpotlights = useCallback(

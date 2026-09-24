@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ScriptScene } from "../../../shared/types/script";
 import type { TheaterViewPrefs } from "../model/theater-view-prefs-storage";
 
@@ -16,19 +16,28 @@ export function useTheaterSelection({
   setActiveTab,
 }: UseTheaterSelectionArgs) {
   const [editMode, setEditMode] = useState<TheaterEditMode>("spotlights");
-  const [dragMode, setDragMode] = useState<"target" | "source">("target");
+  const [dragMode, setDragMode] = useState<"target" | "source" | null>("target");
   const [multiSelectedModelIds, setMultiSelectedModelIds] = useState<number[]>([]);
   const [multiSelectedSpotlightIds, setMultiSelectedSpotlightIds] = useState<number[]>([]);
 
   const activeSpotlightId = currentScene?.theaterActiveSpotlightId;
   const activeModelId = currentScene?.theaterActiveModelId;
+  const selectionSceneIdRef = useRef(currentScene?.id);
 
   useEffect(() => {
-    if (activeModelId != null) {
-      setMultiSelectedModelIds([activeModelId]);
-    } else {
+    const sceneChanged = selectionSceneIdRef.current !== currentScene?.id;
+    selectionSceneIdRef.current = currentScene?.id;
+    if (activeModelId == null) {
       setMultiSelectedModelIds([]);
+      return;
     }
+    if (sceneChanged) {
+      setMultiSelectedModelIds([activeModelId]);
+      return;
+    }
+    setMultiSelectedModelIds((prev) =>
+      prev.includes(activeModelId) ? prev : [activeModelId],
+    );
   }, [activeModelId, currentScene?.id]);
 
   useEffect(() => {

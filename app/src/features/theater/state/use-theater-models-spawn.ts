@@ -12,6 +12,10 @@ import {
   resolveLightRigHeight,
 } from "../model/theater-light-rig";
 import { resolveFloorYAt } from "../model/theater-stage-floor";
+import {
+  dissolveOrphanModelGroups,
+  retargetCopiedModelGroups,
+} from "../model/theater-model-groups";
 import { isLightTrussModel } from "../model/theater-truss-mounts";
 import type { TheaterEditMode } from "./use-theater-selection";
 
@@ -146,7 +150,9 @@ export function useTheaterModelsSpawn({
   const removeSelectedModels = useCallback(() => {
     if (multiSelectedModelIds.length === 0 || !currentScene) return;
     const selected = new Set(multiSelectedModelIds);
-    const next = models.filter((item) => !selected.has(item.id));
+    const next = dissolveOrphanModelGroups(
+      models.filter((item) => !selected.has(item.id)),
+    );
     updateModels(next);
     updateCurrentScene({ theaterActiveModelId: next[0]?.id });
     setMultiSelectedModelIds(next[0] ? [next[0].id] : []);
@@ -183,8 +189,13 @@ export function useTheaterModelsSpawn({
       });
     });
     if (copies.length === 0) return;
-    updateModels([...models, ...copies]);
-    const copyIds = copies.map((item) => item.id);
+    const occupiedMaxGroupId = models.reduce(
+      (maxId, model) => Math.max(maxId, model.groupId ?? 0),
+      0,
+    );
+    const detachedCopies = retargetCopiedModelGroups(copies, occupiedMaxGroupId);
+    updateModels([...models, ...detachedCopies]);
+    const copyIds = detachedCopies.map((item) => item.id);
     setMultiSelectedModelIds(copyIds);
     updateCurrentScene({ theaterActiveModelId: copyIds[0] });
     setEditMode((mode) => (mode === "decor" ? "decor" : "models"));
@@ -202,7 +213,7 @@ export function useTheaterModelsSpawn({
 
   const removeModel = (id: number) => {
     if (!currentScene) return;
-    const next = models.filter((item) => item.id !== id);
+    const next = dissolveOrphanModelGroups(models.filter((item) => item.id !== id));
     updateModels(next);
     if (activeModelId === id) {
       updateCurrentScene({ theaterActiveModelId: next[0]?.id });
@@ -216,8 +227,9 @@ export function useTheaterModelsSpawn({
     const nextId = models.reduce((acc, item) => Math.max(acc, item.id), 0) + 1;
     const offsetX = 0.3;
     const offsetZ = 0.3;
+    const { groupId: _groupId, ...sourceWithoutGroup } = source;
     const nextItem: TheaterModel = {
-      ...source,
+      ...sourceWithoutGroup,
       id: nextId,
       name: `${source.name} (копия)`,
       position: [

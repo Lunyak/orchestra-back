@@ -8,7 +8,7 @@ export function TheaterControlsLayoutExportSection({
   return (
     <TheaterCollapsibleSection
       sectionId="layout-export"
-      title="Экспорт плана"
+      title="Экспорт"
       static
     >
       <div className="theater-btn-row theater-btn-row--3">
@@ -31,6 +31,13 @@ export function TheaterControlsLayoutExportSection({
           PDF
         </TheaterBtn>
       </div>
+      <TheaterBtn
+        onClick={vm.exportPrintPackage}
+        disabled={!vm.currentScene}
+        title="План зала и лист приборов: номер, канал, цвет, ферма, наведение"
+      >
+        Печатный пакет
+      </TheaterBtn>
       <TheaterBtn
         onClick={() => void vm.copyFloorPlanToClipboard()}
         disabled={!vm.currentScene}

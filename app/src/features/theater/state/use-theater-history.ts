@@ -15,6 +15,15 @@ import {
   type TheaterHistorySnapshot,
 } from "../model/theater-history";
 import {
+  buildTheaterSnapshotFromSet,
+  writeTheaterSnapshotOntoKadr,
+} from "../model/kadr-theater-snapshot";
+import {
+  getTheaterActiveKadrId,
+  rememberKadrTheaterBaseline,
+  replaceTheaterKadrDraft,
+} from "../model/theater-active-kadr";
+import {
   readSceneTheaterModels,
   writeSceneTheaterModels,
 } from "../model/theater-scene-models";
@@ -77,18 +86,50 @@ export function useTheaterHistory({
     (snapshot: TheaterHistorySnapshot) => {
       applyingHistoryRef.current = true;
       try {
+        const kadrId = getTheaterActiveKadrId();
+        if (currentScene && currentScene.id === snapshot.sceneId && kadrId) {
+          const lightKadrs = writeTheaterSnapshotOntoKadr(
+            currentScene,
+            kadrId,
+            buildTheaterSnapshotFromSet({
+              models: snapshot.theaterModels,
+              spotlights: snapshot.theaterSpotlights,
+              smokeEnabled: currentScene.theaterSmokeMachine === true,
+            }),
+          );
+          replaceTheaterKadrDraft({
+            models: snapshot.theaterModels,
+            spotlights: snapshot.theaterSpotlights,
+          });
+          onTheaterLayoutChange?.(snapshot.layout);
+          if (lightKadrs) updateScene(snapshot.sceneId, { lightKadrs });
+          return;
+        }
         onTheaterLayoutChange?.(snapshot.layout);
+        const lightKadrs =
+          currentScene && currentScene.id === snapshot.sceneId
+            ? writeTheaterSnapshotOntoKadr(
+                currentScene,
+                getTheaterActiveKadrId(),
+                buildTheaterSnapshotFromSet({
+                  models: snapshot.theaterModels,
+                  spotlights: snapshot.theaterSpotlights,
+                  smokeEnabled: currentScene.theaterSmokeMachine === true,
+                }),
+              )
+            : null;
         updateScene(snapshot.sceneId, {
           theaterSpotlights: snapshot.theaterSpotlights,
           ...writeSceneTheaterModels(snapshot.theaterModels),
           theaterActiveSpotlightId: snapshot.theaterActiveSpotlightId,
           theaterActiveModelId: snapshot.theaterActiveModelId,
+          ...(lightKadrs ? { lightKadrs } : {}),
         });
       } finally {
         applyingHistoryRef.current = false;
       }
     },
-    [onTheaterLayoutChange, updateScene],
+    [currentScene, onTheaterLayoutChange, updateScene],
   );
 
   const recordTheaterHistory = useCallback(() => {
@@ -103,7 +144,17 @@ export function useTheaterHistory({
     if (historyTransactionRef.current) return;
     recordTheaterHistory();
     historyTransactionRef.current = true;
-  }, [recordTheaterHistory]);
+    if (!currentScene) return;
+    const spotlights =
+      currentScene.theaterSpotlights === undefined
+        ? DEFAULT_SPOTLIGHTS
+        : currentScene.theaterSpotlights;
+    rememberKadrTheaterBaseline(
+      readSceneTheaterModels(currentScene),
+      spotlights,
+      true,
+    );
+  }, [currentScene, recordTheaterHistory]);
 
   const endTheaterHistoryTransaction = useCallback(() => {
     historyTransactionRef.current = false;

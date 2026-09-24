@@ -23,6 +23,11 @@ import {
   insertKadrInSceneData,
   upsertFullKadrInScene,
 } from "../../theater/model/kadr-store";
+import {
+  buildTheaterSnapshotFromSet,
+  captureSceneTheaterSnapshot,
+} from "../../theater/model/kadr-theater-snapshot";
+import { getTheaterKadrDraft } from "../../theater/model/theater-active-kadr";
 import type { KadrProjectorCue } from "../../theater/model/kadr-projector";
 import { getPlaylistPlaybackSnapshot } from "../../playbook/model/playbook-playback-bridge";
 import { readPlayerVolume } from "../../../shared/player/player-prefs";
@@ -341,6 +346,11 @@ function applyKadrDraftToJson(args: ApplyKadrDraftArgs): {
     kadr = rest;
   }
 
+  const existingKadr = findKadrById(args.kadrs, kadrId);
+  if (existingKadr?.theaterSnapshot) {
+    kadr = { ...kadr, theaterSnapshot: existingKadr.theaterSnapshot };
+  }
+
   const nextKadrs = upsertFullKadrInScene({ kadrs: args.kadrs, kadr });
 
   const parts = [`Картина ${kadrNo} ${args.summaryVerb}`];
@@ -475,9 +485,20 @@ export function createKadrFromDraft(args: {
   summary: string;
 } | null {
   const { scene, draft } = args;
+  // Картина без своего сета не бывает: копируем то, что сейчас на сцене.
+  // Если уже открыта другая картина — копируем её черновик, не устаревшие поля сцены.
+  const liveSet = getTheaterKadrDraft();
+  const theaterSnapshot = liveSet
+    ? buildTheaterSnapshotFromSet({
+        models: liveSet.models,
+        spotlights: liveSet.spotlights,
+        smokeEnabled: scene.theaterSmokeMachine === true,
+      })
+    : captureSceneTheaterSnapshot(scene);
   const base = insertKadrInSceneData({
     scene,
     afterKadrId: args.insertAfter?.id ?? null,
+    theaterSnapshot,
   });
 
   return applyKadrDraftToJson({

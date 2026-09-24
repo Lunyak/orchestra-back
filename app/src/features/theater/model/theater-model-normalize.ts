@@ -58,6 +58,9 @@ export function normalizeTheaterModels(items: TheaterModel[]): TheaterModel[] {
       humanShoeColor: item.humanShoeColor,
       ...(item.hidden ? { hidden: true } : {}),
       ...(item.isRequisite ? { isRequisite: true } : {}),
+      ...(typeof item.groupId === "number" && item.groupId > 0
+        ? { groupId: item.groupId }
+        : {}),
     };
   });
 }

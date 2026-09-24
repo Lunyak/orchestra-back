@@ -64,3 +64,70 @@ export function theaterSpotlightLightIntensity(
   const base = Math.max(0, uiIntensity) * THEATER_SPOTLIGHT_INTENSITY_SCALE;
   return isRgb ? base * THEATER_SPOTLIGHT_RGB_INTENSITY_MULT : base;
 }
+
+/** Сколько софитов одновременно отбрасывают тень. */
+export const THEATER_SPOTLIGHT_SHADOW_BUDGET = 4;
+/** Сколько объёмных лучей дыма рисуем сразу. */
+export const THEATER_SMOKE_BEAM_BUDGET = 12;
+export const THEATER_SPOTLIGHT_SHADOW_MAP_SIZE = 512;
+
+type SpotlightBudgetItem = {
+  id: number;
+  enabled?: boolean;
+  intensity?: number;
+};
+
+/**
+ * Тени и лучи дыма — бюджет.
+ * Сначала выбранные включённые, остаток слотов — ключевые (самые яркие).
+ */
+export function resolveSpotlightLightBudget(
+  spotlights: readonly SpotlightBudgetItem[],
+  selectedIds: readonly number[],
+): { shadowIds: ReadonlySet<number>; smokeBeamIds: ReadonlySet<number> } {
+  const live = spotlights.filter((item) => {
+    if (item.enabled === false) return false;
+    const intensity = item.intensity ?? THEATER_SPOTLIGHT_DEFAULT_UI_INTENSITY;
+    return intensity > 0;
+  });
+  const byBrightness = [...live].sort((a, b) => {
+    const intensityA = a.intensity ?? THEATER_SPOTLIGHT_DEFAULT_UI_INTENSITY;
+    const intensityB = b.intensity ?? THEATER_SPOTLIGHT_DEFAULT_UI_INTENSITY;
+    if (intensityB !== intensityA) return intensityB - intensityA;
+    return a.id - b.id;
+  });
+  const selected = new Set(selectedIds);
+  return {
+    shadowIds: fillSpotlightBudget(
+      byBrightness,
+      selected,
+      THEATER_SPOTLIGHT_SHADOW_BUDGET,
+    ),
+    smokeBeamIds: fillSpotlightBudget(
+      byBrightness,
+      selected,
+      THEATER_SMOKE_BEAM_BUDGET,
+    ),
+  };
+}
+
+function fillSpotlightBudget(
+  ranked: readonly SpotlightBudgetItem[],
+  selected: ReadonlySet<number>,
+  budget: number,
+): ReadonlySet<number> {
+  const ids: number[] = [];
+  const taken = new Set<number>();
+  for (const item of ranked) {
+    if (!selected.has(item.id)) continue;
+    ids.push(item.id);
+    taken.add(item.id);
+    if (ids.length >= budget) return new Set(ids);
+  }
+  for (const item of ranked) {
+    if (taken.has(item.id)) continue;
+    ids.push(item.id);
+    if (ids.length >= budget) break;
+  }
+  return new Set(ids);
+}

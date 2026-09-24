@@ -47,6 +47,7 @@ export function TheaterCanvasShell({
     <Canvas
       className={className}
       camera={{ position: camera.position, fov: camera.fov }}
+      shadows
       gl={{ antialias: true, preserveDrawingBuffer: false }}
       resize={{ debounce: 0, scroll: false }}
       onCreated={({ gl, setEvents }) => {

@@ -9,20 +9,28 @@ import { isTheaterDecorModel } from "../model/theater-decor-catalog";
 import { findKadrById, readSceneLightKadrs, upsertKadrInScene } from "../model/light-kadrs";
 import { kadrDisplayTitle } from "../model/kadr-store";
 import {
-  resolveAdjacentSceneIndex,
-  type TheaterAdjacentSceneDirection,
-} from "../model/theater-model-clone";
+  buildTheaterSnapshotFromSet,
+  writeTheaterSnapshotOntoKadr,
+} from "../model/kadr-theater-snapshot";
+import { buildSceneKadrTape, type SceneKadrTapeItem } from "../model/scene-kadr-tape";
+import {
+  getTheaterActiveKadrId,
+  replaceTheaterKadrDraft,
+  useTheaterKadrDraftModels,
+} from "../model/theater-active-kadr";
+import type { TheaterAdjacentSceneDirection } from "../model/theater-model-clone";
 import { isTheaterPersonModel } from "../model/theater-model-builtin";
 import {
+  applyTheaterCopyToScene,
   buildCopiedTheaterScenePatch,
   buildCopiedTheaterSnapshot,
   formatTheaterCopyCategories,
   readTheaterSnapshotCopySource,
+  resolveActiveCopyCategories,
   resolveTheaterCopySource,
   type TheaterCopySetOptions,
 } from "../model/theater-copy-set";
 import { readSceneTheaterModels } from "../model/theater-scene-models";
-import { DEFAULT_SPOTLIGHTS } from "../model/theater-defaults";
 
 type UseTheaterCopyArgs = {
   currentPage: number;
@@ -46,8 +54,40 @@ type UseTheaterCopyArgs = {
   saveScenes: (options?: { force?: boolean }) => Promise<void>;
 };
 
-function sceneTitle(scene: ScriptScene | undefined, index: number): string {
-  return scene?.title?.trim() || `сцена ${index + 1}`;
+function pictureTitle(item: SceneKadrTapeItem): string {
+  return item.isPlaceholder ? item.sceneTitle : item.headingTitle;
+}
+
+function findCurrentPictureIndex(
+  tape: SceneKadrTapeItem[],
+  currentPage: number,
+): number {
+  const activeId = getTheaterActiveKadrId();
+  if (activeId) {
+    const activeIndex = tape.findIndex((item) => item.kadrId === activeId);
+    if (activeIndex >= 0) return activeIndex;
+  }
+  return tape.findIndex(
+    (item) => item.sceneIndex === currentPage && item.isPlaceholder,
+  );
+}
+
+function readPictureSet(
+  scenes: ScriptScene[],
+  item: SceneKadrTapeItem,
+): { models: TheaterModel[]; spotlights: TheaterSpotlight[] } {
+  const scene = scenes[item.sceneIndex];
+  if (!scene) return { models: [], spotlights: [] };
+  if (item.kadrId) {
+    const kadr = findKadrById(readSceneLightKadrs(scene), item.kadrId);
+    if (kadr?.theaterSnapshot) {
+      return readTheaterSnapshotCopySource(kadr.theaterSnapshot);
+    }
+  }
+  return {
+    models: readSceneTheaterModels(scene),
+    spotlights: scene.theaterSpotlights ?? [],
+  };
 }
 
 export function useTheaterCopy({
@@ -71,6 +111,14 @@ export function useTheaterCopy({
   setDecorActionMessage,
   saveScenes,
 }: UseTheaterCopyArgs) {
+  useTheaterKadrDraftModels();
+  const tape = buildSceneKadrTape(scenes);
+  const currentPictureIndex = findCurrentPictureIndex(tape, currentPage);
+  const previousPicture =
+    currentPictureIndex > 0 ? tape[currentPictureIndex - 1] : undefined;
+  const nextPicture =
+    currentPictureIndex >= 0 ? tape[currentPictureIndex + 1] : undefined;
+
   const resolveLiveSource = useCallback(
     (options: TheaterCopySetOptions) => {
       const selectedModelIds =
@@ -104,38 +152,85 @@ export function useTheaterCopy({
     ],
   );
 
-  const copyTheaterSetToAdjacentScene = useCallback(
+  const writeOntoPicture = useCallback(
+    (
+      item: SceneKadrTapeItem,
+      sourceModels: TheaterModel[],
+      sourceSpotlights: TheaterSpotlight[],
+      options: TheaterCopySetOptions,
+      mode: "replace" | "append",
+    ) => {
+      const scene = scenes[item.sceneIndex];
+      if (!scene) return [];
+      const base = readPictureSet(scenes, item);
+      const appliedCategories = resolveActiveCopyCategories({
+        categories: options.categories,
+        sourceModels,
+        sourceSpotlights,
+        skipEmptyCategories: true,
+      });
+      if (appliedCategories.length === 0) return [];
+      const merged = applyTheaterCopyToScene({
+        targetModels: base.models,
+        targetSpotlights: base.spotlights,
+        sourceModels,
+        sourceSpotlights,
+        categories: appliedCategories,
+        mode,
+      });
+      if (item.kadrId) {
+        const lightKadrs = writeTheaterSnapshotOntoKadr(
+          scene,
+          item.kadrId,
+          buildTheaterSnapshotFromSet({
+            models: merged.models,
+            spotlights: merged.spotlights,
+            smokeEnabled: scene.theaterSmokeMachine === true,
+          }),
+        );
+        if (lightKadrs) updateScene(scene.id, { lightKadrs });
+        return appliedCategories;
+      }
+      const { patch } = buildCopiedTheaterScenePatch({
+        targetScene: scene,
+        sourceModels,
+        sourceSpotlights,
+        categories: appliedCategories,
+        mode,
+        layout,
+        skipEmptyCategories: false,
+      });
+      updateScene(scene.id, patch);
+      return appliedCategories;
+    },
+    [layout, scenes, updateScene],
+  );
+
+  const copyTheaterSetToAdjacentPicture = useCallback(
     (direction: TheaterAdjacentSceneDirection, options: TheaterCopySetOptions) => {
       if (!currentScene) return;
-      const targetIndex = resolveAdjacentSceneIndex(
-        currentPage,
-        scenes.length,
-        direction,
-      );
-      if (targetIndex == null) {
-        setDecorActionMessage(
-          direction === "previous" ? "Нет предыдущей сцены" : "Нет следующей сцены",
-        );
+      if (currentPictureIndex < 0) {
+        setDecorActionMessage("Сначала выберите картину");
         return;
       }
-      const targetScene = scenes[targetIndex];
-      if (!targetScene) {
+      const target = direction === "previous" ? previousPicture : nextPicture;
+      if (!target) {
         setDecorActionMessage(
-          direction === "previous" ? "Нет предыдущей сцены" : "Нет следующей сцены",
+          direction === "previous"
+            ? "Нет предыдущей картины"
+            : "Нет следующей картины",
         );
         return;
       }
       const source = resolveLiveSource(options);
       const mode = options.scope === "selected" ? "append" : "replace";
-      const { patch, appliedCategories } = buildCopiedTheaterScenePatch({
-        targetScene,
-        sourceModels: source.models,
-        sourceSpotlights: source.spotlights,
-        categories: options.categories,
+      const appliedCategories = writeOntoPicture(
+        target,
+        source.models,
+        source.spotlights,
+        options,
         mode,
-        layout,
-        skipEmptyCategories: true,
-      });
+      );
       if (appliedCategories.length === 0) {
         setDecorActionMessage(
           options.scope === "selected"
@@ -144,66 +239,99 @@ export function useTheaterCopy({
         );
         return;
       }
-      updateScene(targetScene.id, patch);
       const scopeLabel = formatTheaterCopyCategories(appliedCategories);
-      const targetTitle = sceneTitle(targetScene, targetIndex);
-      setDecorActionMessage(`${scopeLabel} скопированы на «${targetTitle}»`);
+      setDecorActionMessage(
+        `${scopeLabel} скопированы на «${pictureTitle(target)}»`,
+      );
     },
     [
-      currentPage,
+      currentPictureIndex,
       currentScene,
-      layout,
+      nextPicture,
+      previousPicture,
       resolveLiveSource,
-      scenes,
       setDecorActionMessage,
-      updateScene,
+      writeOntoPicture,
     ],
   );
 
-  const applyTheaterSetFromAdjacentScene = useCallback(
+  const applyTheaterSetFromAdjacentPicture = useCallback(
     (direction: TheaterAdjacentSceneDirection, options: TheaterCopySetOptions) => {
       if (!currentScene) return;
-      const sourceIndex = resolveAdjacentSceneIndex(
-        currentPage,
-        scenes.length,
-        direction,
-      );
-      if (sourceIndex == null) {
+      if (currentPictureIndex < 0) {
+        setDecorActionMessage("Сначала выберите картину");
+        return;
+      }
+      const sourceItem = direction === "previous" ? previousPicture : nextPicture;
+      if (!sourceItem) {
         setDecorActionMessage(
-          direction === "previous" ? "Нет предыдущей сцены" : "Нет следующей сцены",
+          direction === "previous"
+            ? "Нет предыдущей картины"
+            : "Нет следующей картины",
         );
         return;
       }
-      const sourceScene = scenes[sourceIndex];
-      if (!sourceScene) {
-        setDecorActionMessage(
-          direction === "previous" ? "Нет предыдущей сцены" : "Нет следующей сцены",
-        );
-        return;
-      }
-      const { patch, appliedCategories } = buildCopiedTheaterScenePatch({
-        targetScene: currentScene,
-        sourceModels: readSceneTheaterModels(sourceScene),
-        sourceSpotlights: sourceScene.theaterSpotlights ?? DEFAULT_SPOTLIGHTS,
+      const source = readPictureSet(scenes, sourceItem);
+      const appliedCategories = resolveActiveCopyCategories({
         categories: options.categories,
-        mode: "replace",
-        layout,
+        sourceModels: source.models,
+        sourceSpotlights: source.spotlights,
         skipEmptyCategories: true,
       });
       if (appliedCategories.length === 0) {
-        setDecorActionMessage("На соседней сцене нечего брать");
+        setDecorActionMessage("На соседней картине нечего брать");
         return;
       }
+      const merged = applyTheaterCopyToScene({
+        targetModels: models,
+        targetSpotlights: displaySpotlights,
+        sourceModels: source.models,
+        sourceSpotlights: source.spotlights,
+        categories: appliedCategories,
+        mode: "replace",
+      });
+      const activeKadrId = getTheaterActiveKadrId();
       recordTheaterHistory();
-      updateCurrentScene(patch);
+      if (activeKadrId) {
+        const lightKadrs = writeTheaterSnapshotOntoKadr(
+          currentScene,
+          activeKadrId,
+          buildTheaterSnapshotFromSet({
+            models: merged.models,
+            spotlights: merged.spotlights,
+            smokeEnabled: currentScene.theaterSmokeMachine === true,
+          }),
+        );
+        replaceTheaterKadrDraft({
+          models: merged.models,
+          spotlights: merged.spotlights,
+        });
+        if (lightKadrs) updateCurrentScene({ lightKadrs });
+      } else {
+        const { patch } = buildCopiedTheaterScenePatch({
+          targetScene: currentScene,
+          sourceModels: source.models,
+          sourceSpotlights: source.spotlights,
+          categories: appliedCategories,
+          mode: "replace",
+          layout,
+          skipEmptyCategories: false,
+        });
+        updateCurrentScene(patch);
+      }
       const scopeLabel = formatTheaterCopyCategories(appliedCategories);
-      const sourceTitle = sceneTitle(sourceScene, sourceIndex);
-      setDecorActionMessage(`${scopeLabel} взяты с «${sourceTitle}»`);
+      setDecorActionMessage(
+        `${scopeLabel} взяты с «${pictureTitle(sourceItem)}»`,
+      );
     },
     [
-      currentPage,
+      currentPictureIndex,
       currentScene,
+      displaySpotlights,
       layout,
+      models,
+      nextPicture,
+      previousPicture,
       recordTheaterHistory,
       scenes,
       setDecorActionMessage,
@@ -348,8 +476,10 @@ export function useTheaterCopy({
   ]);
 
   return {
-    copyTheaterSetToAdjacentScene,
-    applyTheaterSetFromAdjacentScene,
+    copyHasPreviousPicture: Boolean(previousPicture),
+    copyHasNextPicture: Boolean(nextPicture),
+    copyTheaterSetToAdjacentPicture,
+    applyTheaterSetFromAdjacentPicture,
     writeTheaterSetToKadr,
     applyTheaterSetFromKadr,
     clearTheaterFurniture,

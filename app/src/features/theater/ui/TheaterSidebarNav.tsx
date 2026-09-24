@@ -1,3 +1,4 @@
+import cn from "classnames";
 import type { ReactNode } from "react";
 import {
   THEATER_SIDEBAR_GROUPS,
@@ -25,7 +26,7 @@ function SidebarGlyph({ children }: IconProps) {
   );
 }
 
-function TheaterSidebarPanelIcon({ panelId }: { panelId: TheaterSidebarPanelId }) {
+export function TheaterSidebarPanelIcon({ panelId }: { panelId: TheaterSidebarPanelId }) {
   if (panelId === "scene") {
     return (
       <SidebarGlyph>
@@ -126,37 +127,53 @@ export function TheaterSidebarHome({ onOpen }: TheaterSidebarHomeProps) {
 }
 
 export type TheaterSidebarPanelHeaderProps = {
-  title: string;
   onBack: () => void;
+  extraPanel?: {
+    open: boolean;
+    onToggle: () => void;
+    label: string;
+  };
 };
 
 export function TheaterSidebarPanelHeader({
-  title,
   onBack,
+  extraPanel,
 }: TheaterSidebarPanelHeaderProps) {
   return (
     <div className="theater-sidebar-panel-header">
+      {extraPanel ? (
+        <button
+          type="button"
+          className={cn(
+            "theater-sidebar-panel-header__back",
+            extraPanel.open && "theater-sidebar-panel-header__back--open",
+          )}
+          onClick={extraPanel.onToggle}
+          title={extraPanel.label}
+          aria-label={extraPanel.label}
+          aria-expanded={extraPanel.open}
+        >
+          <svg
+            className="theater-sidebar-panel-header__back-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <path d="M15 6l-6 6 6 6" />
+          </svg>
+        </button>
+      ) : null}
       <button
         type="button"
-        className="theater-sidebar-panel-header__back"
+        className="theater-sidebar-panel-header__title"
         onClick={onBack}
-        title="К списку панелей"
-        aria-label="Назад к списку панелей"
       >
-        <svg
-          className="theater-sidebar-panel-header__back-icon"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden
-        >
-          <path d="M15 6l-6 6 6 6" />
-        </svg>
+        Назад
       </button>
-      <span className="theater-sidebar-panel-header__title">{title}</span>
     </div>
   );
 }

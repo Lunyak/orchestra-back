@@ -1,10 +1,13 @@
 import { FC, useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { ChalkPageShell } from "../../shared/component/ChalkPageShell/ChalkPageShell";
 import { ChalkPlaybill } from "../../shared/component/ChalkPlaybill/ChalkPlaybill";
 import { Seo } from "../../shared/component/Seo/Seo";
 import type { SiteEvent } from "../../shared/model/siteContent";import { fetchSiteEvents, readSiteEventsCache } from "../../shared/model/siteContent";
 
 const EventsPage: FC = () => {
+  const { pathname } = useLocation();
+  const showSeo = pathname === "/события" || pathname === "/events";
   const [items, setItems] = useState<SiteEvent[]>(() => readSiteEventsCache() ?? []);
   const [eventsFetchSettled, setEventsFetchSettled] = useState(false);
 
@@ -27,7 +30,8 @@ const EventsPage: FC = () => {
   const isLoading = items.length === 0 && !eventsFetchSettled;
 
   return (
-    <ChalkPageShell mainClassName="chalk-page__main--afisha" scrollable showHomeBack>
+    <ChalkPageShell mainClassName="chalk-page__main--afisha" scrollable showHomeBack showSectionNav={false}>
+      {showSeo && (
       <Seo
         title="Спектакли и афиша — Дофамин"
         description="Афиша театра «Дофамин»: спектакли, описание и ссылки на покупку билетов онлайн."
@@ -49,9 +53,10 @@ const EventsPage: FC = () => {
             })),
         }}
       />
+      )}
 
       <h1 className="chalk-page__title">АФИША</h1>
-      <p className="chalk-page__subtitle">театр «Дофамин»</p>
+      <p className="chalk-page__subtitle">театра «Дофамин»</p>
       <div className="chalk-page__rule" aria-hidden />
 
       <ChalkPlaybill items={items} loading={isLoading} />

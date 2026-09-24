@@ -16,6 +16,14 @@ import {
 import { isLightTrussModel, syncMountedSpotlights } from "../model/theater-truss-mounts";
 import { setLightTrussHeight } from "../model/theater-light-rig";
 import { buildCopiedTheaterScenePatch } from "../model/theater-copy-set";
+import { commitActiveKadrTheaterSet } from "../model/kadr-theater-snapshot";
+import {
+  getTheaterActiveKadrId,
+  getTheaterKadrDraft,
+  rememberKadrTheaterBaseline,
+  replaceTheaterKadrDraft,
+  takeKadrTheaterBaseline,
+} from "../model/theater-active-kadr";
 import {
   cloneTheaterModels,
   resolveAdjacentSceneIndex,
@@ -58,6 +66,33 @@ export function useTheaterModelsPersistence({
     (next: TheaterModel[]) => {
       recordTheaterHistory();
       const normalizedModels = normalizeModels(next);
+      const kadrId = getTheaterActiveKadrId();
+      if (kadrId && currentScene) {
+        const draft = getTheaterKadrDraft();
+        const sourceSpotlights =
+          draft?.spotlights ??
+          currentScene.theaterSpotlights ??
+          displaySpotlights;
+        const nextSpotlights = syncMountedSpotlights(
+          sourceSpotlights,
+          normalizedModels,
+        );
+        const savedBaseline = takeKadrTheaterBaseline();
+        const lightKadrs = commitActiveKadrTheaterSet({
+          scene: currentScene,
+          activeKadrId: kadrId,
+          previousModels: savedBaseline?.models ?? draft?.models ?? models,
+          nextModels: normalizedModels,
+          previousSpotlights: savedBaseline?.spotlights ?? sourceSpotlights,
+          nextSpotlights,
+        });
+        replaceTheaterKadrDraft({
+          models: normalizedModels,
+          spotlights: nextSpotlights,
+        });
+        if (lightKadrs) updateCurrentScene({ lightKadrs });
+        return;
+      }
       const sourceSpotlights =
         currentScene?.theaterSpotlights ?? displaySpotlights;
       const nextSpotlights = syncMountedSpotlights(
@@ -73,6 +108,17 @@ export function useTheaterModelsPersistence({
         normalizedModels,
       );
       const requisitesChanged = nextRequisites !== prevRequisites;
+      const baseline = takeKadrTheaterBaseline();
+      const lightKadrs = currentScene
+        ? commitActiveKadrTheaterSet({
+            scene: currentScene,
+            activeKadrId: getTheaterActiveKadrId(),
+            previousModels: baseline?.models ?? models,
+            nextModels: normalizedModels,
+            previousSpotlights: baseline?.spotlights ?? sourceSpotlights,
+            nextSpotlights,
+          })
+        : null;
       updateCurrentScene({
         ...writeSceneTheaterModels(normalizedModels),
         ...(spotlightsChanged
@@ -82,13 +128,14 @@ export function useTheaterModelsPersistence({
             }
           : {}),
         ...(requisitesChanged ? { requisites: nextRequisites } : {}),
+        ...(lightKadrs ? { lightKadrs } : {}),
       });
     },
     [
-      currentScene?.requisites,
-      currentScene?.theaterSpotlights,
+      currentScene,
       displaySpotlights,
       layout,
+      models,
       normalizeModels,
       recordTheaterHistory,
       updateCurrentScene,
@@ -97,6 +144,30 @@ export function useTheaterModelsPersistence({
 
   const syncSpotlightsForModels = useCallback(
     (nextModels: TheaterModel[], mountModelId?: number) => {
+      const kadrId = getTheaterActiveKadrId();
+      const draft = getTheaterKadrDraft();
+      if (kadrId && currentScene && draft) {
+        const nextSpotlights = syncMountedSpotlights(
+          draft.spotlights,
+          nextModels,
+          mountModelId,
+        );
+        const changed = nextSpotlights.some(
+          (spotlight, index) => spotlight !== draft.spotlights[index],
+        );
+        if (!changed) return;
+        const lightKadrs = commitActiveKadrTheaterSet({
+          scene: currentScene,
+          activeKadrId: kadrId,
+          previousModels: draft.models,
+          nextModels,
+          previousSpotlights: draft.spotlights,
+          nextSpotlights,
+        });
+        replaceTheaterKadrDraft({ models: nextModels, spotlights: nextSpotlights });
+        if (lightKadrs) updateCurrentScene({ lightKadrs });
+        return;
+      }
       const sourceSpotlights =
         currentScene?.theaterSpotlights ?? displaySpotlights;
       const nextSpotlights = syncMountedSpotlights(
@@ -114,6 +185,7 @@ export function useTheaterModelsPersistence({
       });
     },
     [
+      currentScene,
       currentScene?.theaterSpotlights,
       displaySpotlights,
       layout,
@@ -153,17 +225,26 @@ export function useTheaterModelsPersistence({
   const previewModel = useCallback(
     (id: number, patch: Partial<TheaterModel>) => {
       if (!currentScene) return;
-      updateCurrentScene(
-        writeSceneTheaterModels(
-          normalizeModels(
-            models.map((item) =>
-              item.id === id ? { ...item, ...patch } : item,
-            ),
-          ),
-        ),
+      const nextModels = normalizeModels(
+        models.map((item) => (item.id === id ? { ...item, ...patch } : item)),
       );
+      if (getTheaterActiveKadrId()) {
+        const draft = getTheaterKadrDraft();
+        if (!draft) return;
+        rememberKadrTheaterBaseline(draft.models, draft.spotlights);
+        replaceTheaterKadrDraft({
+          models: nextModels,
+          spotlights: draft.spotlights,
+        });
+        return;
+      }
+      rememberKadrTheaterBaseline(
+        models,
+        currentScene.theaterSpotlights ?? displaySpotlights,
+      );
+      updateCurrentScene(writeSceneTheaterModels(nextModels));
     },
-    [currentScene, models, normalizeModels, updateCurrentScene],
+    [currentScene, displaySpotlights, models, normalizeModels, updateCurrentScene],
   );
 
   const copyModelsFromPreviousScene = () => {

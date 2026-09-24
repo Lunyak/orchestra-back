@@ -68,7 +68,7 @@ export type TheaterDocumentSlice = {
 export type TheaterSelectionSlice = {
   activeTab: TheaterViewPrefs["activeTab"];
   editMode: "spotlights" | "models" | "decor";
-  dragMode: "target" | "source";
+  dragMode: "target" | "source" | null;
   isDragging: boolean;
   activeSpotlightId: number | undefined;
   activeModelId: number | undefined;

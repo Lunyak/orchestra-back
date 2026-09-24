@@ -3,7 +3,8 @@ export type TheaterKitGroup =
   | 'rig'
   | 'doors'
   | 'humans'
-  | 'library';
+  | 'library'
+  | 'textures';
 
 export type TheaterKitSlot = {
   id: string;
@@ -16,8 +17,12 @@ const LIBRARY: Array<{ assetKey: string; label: string }> = [
   { assetKey: 'wooden-chair', label: 'Деревянный стул' },
   { assetKey: 'velvet-armchair', label: 'Бархатное кресло' },
   { assetKey: 'velvet-sofa', label: 'Бархатный диван' },
+  { assetKey: 'sofa-02', label: 'Диван 2' },
+  { assetKey: 'sofa-03', label: 'Диван 3' },
   { assetKey: 'dining-table', label: 'Обеденный стол' },
+  { assetKey: 'dining-table-02', label: 'Обеденный стол 2' },
   { assetKey: 'round-pedestal-table', label: 'Круглый стол' },
+  { assetKey: 'round-wooden-table', label: 'Круглый деревянный стол' },
   { assetKey: 'bar-stool', label: 'Барный табурет' },
   { assetKey: 'painted-wooden-stool', label: 'Крашеный табурет' },
   { assetKey: 'painted-wooden-chair', label: 'Крашеный стул' },
@@ -44,6 +49,21 @@ const LIBRARY: Array<{ assetKey: string; label: string }> = [
   { assetKey: 'ceramic-vase', label: 'Керамическая ваза' },
   { assetKey: 'gilded-picture-frame', label: 'Картина в раме' },
 ];
+
+const TEXTURES: Array<{ assetKey: string; label: string }> = [
+  { assetKey: 'velour-velvet', label: 'Велюр' },
+  { assetKey: 'jogging-melange', label: 'Меланж' },
+  { assetKey: 'moldy-wallpaper', label: 'Плесневелые обои' },
+];
+
+function textureSlots(): TheaterKitSlot[] {
+  return TEXTURES.map((item) => ({
+    id: item.assetKey,
+    group: 'textures' as const,
+    label: item.label,
+    key: `theater/textures/${item.assetKey}.jpg`,
+  }));
+}
 
 function librarySlots(): TheaterKitSlot[] {
   return LIBRARY.flatMap((item) => [
@@ -136,6 +156,7 @@ export const THEATER_KIT_SLOTS: TheaterKitSlot[] = [
     key: 'theater/humans/stage-blocking-actor.glb',
   },
   ...librarySlots(),
+  ...textureSlots(),
 ];
 
 export const THEATER_KIT_PREFIX = 'theater/';

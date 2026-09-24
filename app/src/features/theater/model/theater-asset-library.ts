@@ -33,6 +33,20 @@ export const THEATER_ASSET_LIBRARY: TheaterAssetLibraryItem[] = [
     size: [2.2, 1.45, 1],
   },
   {
+    builtin: "librarySofa02",
+    assetKey: "sofa-02",
+    label: "Диван 2",
+    category: "furniture",
+    size: [1.81, 0.71, 0.82],
+  },
+  {
+    builtin: "librarySofa03",
+    assetKey: "sofa-03",
+    label: "Диван 3",
+    category: "furniture",
+    size: [2.73, 1.12, 0.93],
+  },
+  {
     builtin: "libraryDiningTable",
     assetKey: "dining-table",
     label: "Обеденный стол",
@@ -40,11 +54,25 @@ export const THEATER_ASSET_LIBRARY: TheaterAssetLibraryItem[] = [
     size: [1.9, 0.85, 1],
   },
   {
+    builtin: "libraryDiningTable02",
+    assetKey: "dining-table-02",
+    label: "Обеденный стол 2",
+    category: "furniture",
+    size: [2.26, 0.88, 1.39],
+  },
+  {
     builtin: "libraryRoundPedestalTable",
     assetKey: "round-pedestal-table",
     label: "Круглый стол",
     category: "furniture",
     size: [1.55, 0.85, 1.55],
+  },
+  {
+    builtin: "libraryRoundWoodenTable",
+    assetKey: "round-wooden-table",
+    label: "Круглый деревянный стол",
+    category: "furniture",
+    size: [1.4, 1.01, 1.4],
   },
   {
     builtin: "libraryBarStool",

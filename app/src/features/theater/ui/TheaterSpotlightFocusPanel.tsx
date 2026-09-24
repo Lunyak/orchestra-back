@@ -31,7 +31,7 @@ function VisibilityIcon({ hidden }: { hidden: boolean }) {
 
 export type TheaterSpotlightFocusPanelProps = {
   spotlight: TheaterSpotlight;
-  dragMode: "target" | "source";
+  dragMode: "target" | "source" | null;
   onToggleEnabled: () => void;
   onToggleHidden: () => void;
   onPickDragMode: (mode: "target" | "source") => void;
@@ -92,7 +92,13 @@ export function TheaterSpotlightFocusPanel({
   }, [spotlight.id, spotlight.label]);
 
   useEffect(() => {
-    setSelectedTrussId(spotlight.mountModelId ?? trusses[0]?.id ?? null);
+    setSelectedTrussId((current) => {
+      if (spotlight.mountModelId != null) return spotlight.mountModelId;
+      const selectionStillExists =
+        current != null && trusses.some((truss) => truss.id === current);
+      if (selectionStillExists) return current;
+      return trusses[0]?.id ?? null;
+    });
   }, [spotlight.id, spotlight.mountModelId, trusses]);
 
   const occupiedMountPointIds = useMemo(

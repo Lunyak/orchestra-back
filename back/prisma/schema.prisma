@@ -720,6 +720,7 @@ model TheaterModel {
   decorTextureRepeat Float?
   decorTextureMode   String?
   decorTextureFaces  Json?
+  groupId            Int?
 
   scene Scene @relation(fields: [sceneId], references: [id])
 }

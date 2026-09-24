@@ -52,7 +52,8 @@ orchestra-servises/
 ├── desktop/           # Electron-приложение (отдельный репо)
 ├── mobile/            # Capacitor — Android / iOS, офлайн-пакет (см. mobile/README.md)
 ├── docs/              # Документация
-│   └── LOGS.md       # Руководство по логам
+│   ├── LOGS.md       # Руководство по логам
+│   └── theater-print-package.md  # 3D театр: план зала и лист приборов
 ├── scripts/           # Скрипты автоматизации
 │   ├── dev.sh        # Запуск dev с hot-reload
 │   ├── prod.sh       # Запуск production
